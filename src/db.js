@@ -119,6 +119,13 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Pre-market columns (added later, safe to re-run)
+      ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_bias VARCHAR(20) DEFAULT '';
+      ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_mental_state INTEGER DEFAULT 0;
+      ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_levels TEXT DEFAULT '';
+      ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_goals TEXT DEFAULT '';
+      ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_rules TEXT[] DEFAULT '{}';
+
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
       CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);

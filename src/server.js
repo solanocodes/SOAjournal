@@ -169,7 +169,10 @@ app.get('/api/journals', authMiddleware, async (req, res) => {
       journals[r.date] = {
         satisfaction: r.satisfaction, emotions: r.emotions || [],
         biases: r.biases || [], lessons: r.lessons || '',
-        observations: r.observations || '', gameplan: r.gameplan || ''
+        observations: r.observations || '', gameplan: r.gameplan || '',
+        pmBias: r.pm_bias || '', pmMentalState: r.pm_mental_state || 0,
+        pmLevels: r.pm_levels || '', pmGoals: r.pm_goals || '',
+        pmRules: r.pm_rules || []
       };
     });
     res.json(journals);
@@ -183,13 +186,16 @@ app.post('/api/journals/:date', authMiddleware, async (req, res) => {
     const { date } = req.params;
     const j = req.body;
     await pool.query(
-      `INSERT INTO daily_journals (user_id, date, satisfaction, emotions, biases, lessons, observations, gameplan)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO daily_journals (user_id, date, satisfaction, emotions, biases, lessons, observations, gameplan, pm_bias, pm_mental_state, pm_levels, pm_goals, pm_rules)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT (user_id, date) DO UPDATE SET
          satisfaction=EXCLUDED.satisfaction, emotions=EXCLUDED.emotions, biases=EXCLUDED.biases,
-         lessons=EXCLUDED.lessons, observations=EXCLUDED.observations, gameplan=EXCLUDED.gameplan`,
+         lessons=EXCLUDED.lessons, observations=EXCLUDED.observations, gameplan=EXCLUDED.gameplan,
+         pm_bias=EXCLUDED.pm_bias, pm_mental_state=EXCLUDED.pm_mental_state,
+         pm_levels=EXCLUDED.pm_levels, pm_goals=EXCLUDED.pm_goals, pm_rules=EXCLUDED.pm_rules`,
       [req.user.id, date, j.satisfaction||0, j.emotions||[], j.biases||[],
-       j.lessons||'', j.observations||'', j.gameplan||'']
+       j.lessons||'', j.observations||'', j.gameplan||'',
+       j.pmBias||'', j.pmMentalState||0, j.pmLevels||'', j.pmGoals||'', j.pmRules||[]]
     );
     res.json({ success: true });
   } catch (err) {
