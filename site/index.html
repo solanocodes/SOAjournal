@@ -2617,6 +2617,9 @@ function generateDailyAI(dayTrades,dj){
 
 // ═══ RISK PLAN ═══
 
+function getRiskPlan(){return _cachedRiskPlan||{}}
+function saveRiskPlan(r){_cachedRiskPlan=r;clearTimeout(window._riskSaveTimer);window._riskSaveTimer=setTimeout(()=>{api('POST','/api/riskplan',r).catch(err=>console.error(err))},500)}
+
 function updateRisk(field,val){const r=getRiskPlan();r[field]=val;saveRiskPlan(r)}
 
 function rRisk(el){
