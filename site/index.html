@@ -852,7 +852,34 @@ input,select,textarea,button{font-family:inherit;outline:none}
 </div>
 
 <script>
-const MENTOR='shawn';
+// ═══ API CLIENT ═══
+let authToken=null;
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(authToken)opts.headers['Authorization']='Bearer '+authToken;
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(path,opts);
+  if(res.status===401){handleLogout();throw new Error('Unauthorized')}
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'API error');
+  return data;
+}
+let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRoadmap=[],_cachedRiskPlan={},_cachedSettings={};
+let _dataLoaded=false;
+async function loadAllData(){
+  try{
+    const [tradeData,journalData,badgeData,milestoneData,roadmapData,riskData,settingsData]=await Promise.all([
+      api('GET','/api/trades'),api('GET','/api/journals'),api('GET','/api/badges'),
+      api('GET','/api/milestones'),api('GET','/api/roadmap'),api('GET','/api/riskplan'),api('GET','/api/settings')
+    ]);
+    trades=tradeData||[];_cachedJournals=journalData||{};_cachedBadges=badgeData||{};
+    _cachedMilestones=milestoneData||{};_cachedRoadmap=roadmapData||[];
+    _cachedRiskPlan=riskData||{};_cachedSettings=settingsData||{};_dataLoaded=true;
+  }catch(err){console.error('Failed to load data:',err);trades=[];_dataLoaded=true}
+}
+
+
+const MENTOR='seansolano';
 const OT=['SPY','QQQ','AAPL','TSLA','AMZN','NVDA','META','MSFT','AMD','GOOG'];
 const FT=['ES','NQ','MES','MNQ','YM','CL','GC','RTY'];
 const STRATEGIES=['SOA Levels','Fibonacci Golden Pocket','TFC','Orderblocks','No Strategy Used'];
@@ -875,8 +902,8 @@ const TICK_VALUES={ES:12.50,MES:1.25,NQ:5.00,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,
 const TICK_SIZES={ES:0.25,MES:0.25,NQ:0.25,MNQ:0.25,YM:1.00,MYM:1.00,RTY:0.10,M2K:0.10,CL:0.01,MCL:0.01,GC:0.10,MGC:0.10,SI:0.005,NG:0.001};
 // Round-trip all-in fees per contract (commission + exchange + clearing + NFA)
 const DEFAULT_RT_FEES={ES:5.00,NQ:5.00,MES:0.50,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:5.00,MCL:0.50,GC:5.00,MGC:0.50,SI:5.00,NG:5.00};
-function getUserRT(){try{return JSON.parse(localStorage.getItem('soa_rtfees_'+curUser)||'{}')}catch{return{}}}
-function saveUserRT(f){localStorage.setItem('soa_rtfees_'+curUser,JSON.stringify(f))}
+function getUserRT(){return(_cachedSettings&&_cachedSettings.customFees)||{}}
+function saveUserRT(f){if(!_cachedSettings)_cachedSettings={};_cachedSettings.customFees=f;api('POST','/api/settings',_cachedSettings).catch(err=>console.error(err))}
 function getRT(){const u=getUserRT();return{...DEFAULT_RT_FEES,...u}}
 // Keep RT_FEES as a getter
 let RT_FEES={...DEFAULT_RT_FEES};
@@ -974,15 +1001,15 @@ let curUser=null,isMentor=false,trades=[],curView='dashboard',editId=null,filter
 let calY,calM,fDir='Long',fSetup=['SOA Levels'],fEmoRating=7,fRules=[],mViewUser=null,repOff=0;
 let pendingImports=[],reviewIndex=0,reviewData=[];let journalDate=null;
 
-function gUsers(){try{return JSON.parse(localStorage.getItem('soa_users')||'{}')}catch{return{}}}
-function sUsers(u){localStorage.setItem('soa_users',JSON.stringify(u))}
+function gUsers(){return{}}
+function sUsers(u){}
 function tK(u){return'soa_t_'+(u||curUser)}
-function ldTr(u){try{return JSON.parse(localStorage.getItem(tK(u))||'[]')}catch{return[]}}
-function svTr(){localStorage.setItem(tK(),JSON.stringify(trades))}
+function ldTr(u){return trades||[]}
+function svTr(){}
 function gCmt(id){try{return JSON.parse(localStorage.getItem('soa_c_'+id)||'[]')}catch{return[]}}
 function sCmt(id,c){const cs=gCmt(id);cs.push(c);localStorage.setItem('soa_c_'+id,JSON.stringify(cs))}
-function gBdg(){try{return JSON.parse(localStorage.getItem('soa_b_'+curUser)||'{}')}catch{return{}}}
-function sBdg(b){localStorage.setItem('soa_b_'+curUser,JSON.stringify(b))}
+function gBdg(){return _cachedBadges||{}}
+function sBdg(b){_cachedBadges=b;Object.keys(b).forEach(id=>{api('POST','/api/badges/'+id).catch(err=>console.error(err))})}
 function allStu(){return Object.keys(gUsers()).filter(n=>n!==MENTOR)}
 
 function gId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
@@ -999,8 +1026,8 @@ function emoText(r){return EMOTION_LABELS[r]||''}
 // ─── AUTH ───
 function handleLogin(){const u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value,e=document.getElementById('loginError');if(!u||!p){e.textContent='Please fill in all fields';e.style.display='block';return}const us=gUsers();if(!us[u]){e.textContent='Account not found';e.style.display='block';return}if(us[u]!==p){e.textContent='Incorrect password';e.style.display='block';return}e.style.display='none';loginAs(u)}
 function handleRegister(){const u=document.getElementById('regUser').value.trim().toLowerCase(),p=document.getElementById('regPass').value,c=document.getElementById('regConfirm').value,e=document.getElementById('regError');if(!u||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(u.length<3){e.textContent='Username must be 3+ characters';e.style.display='block';return}if(p.length<4){e.textContent='Password must be 4+ characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}const us=gUsers();if(us[u]){e.textContent='Username taken';e.style.display='block';return}us[u]=p;sUsers(us);e.style.display='none';loginAs(u)}
-function loginAs(u){curUser=u;isMentor=(u===MENTOR);refreshFees();setTimeout(()=>{if(shouldShowWalkthrough())startWalkthrough()},800);localStorage.setItem('soa_cur',u);trades=ldTr();document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('active');document.getElementById('headerUser').textContent=u;document.getElementById('mentorBadge').style.display=isMentor?'inline':'none';const n=new Date();calY=n.getFullYear();calM=n.getMonth();repOff=0;mViewUser=null;bNav();sv('dashboard')}
-function handleLogout(){curUser=null;localStorage.removeItem('soa_cur');document.getElementById('app').classList.remove('active');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value=''}
+function loginAs(u,mentor){curUser=u;isMentor=mentor||false;document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('active');document.getElementById('headerUser').textContent=u;document.getElementById('mentorBadge').style.display=isMentor?'inline':'none';const n=new Date();calY=n.getFullYear();calM=n.getMonth();repOff=0;mViewUser=null;loadAllData().then(()=>{refreshFees();bNav();sv('dashboard');setTimeout(()=>{if(shouldShowWalkthrough())startWalkthrough()},800)}).catch(err=>{console.error(err);bNav();sv('dashboard')})}
+function handleLogout(){curUser=null;authToken=null;localStorage.removeItem('soa_token');_dataLoaded=false;trades=[];_cachedJournals={};_cachedBadges={};_cachedMilestones={};document.getElementById('app').classList.remove('active');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value=''}
 function toggleAuth(){const l=document.getElementById('loginForm'),r=document.getElementById('registerForm');const s=l.style.display!=='none';l.style.display=s?'none':'block';r.style.display=s?'block':'none';document.getElementById('loginError').style.display='none';document.getElementById('regError').style.display='none'}
 
 // ─── NAV ───
@@ -1533,7 +1560,7 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
     </div>`;
   }
   el.innerHTML=h}
-function mTotw(u,id){const st=ldTr(u);const up=st.map(t=>({...t,totw:t.id===id?!t.totw:(t.totw||false)}));localStorage.setItem(tK(u),JSON.stringify(up));ren()}
+function mTotw(u,id){trades=trades.map(t=>({...t,totw:t.id===id?!t.totw:(t.totw||false)}));ren()}
 function pCmt(id){const el=document.getElementById('mc-'+id);if(!el||!el.value.trim())return;sCmt(id,{a:curUser,t:el.value.trim(),d:new Date().toISOString()});ren()}
 
 // ═══ EXPORT / SHARE AS IMAGE ═══
@@ -1815,7 +1842,7 @@ const MILESTONES=[
   {id:'all_rules_25',icon:'🏛️',title:'Ironclad!',desc:'All 8 rules followed on 25 consecutive trades. You ARE the system.',check:t=>{let c=0;for(const x of t){if((x.rulesFollowed||[]).length===8){c++;if(c>=25)return true}else c=0}return false}},
   
   // Journal Engagement
-  {id:'first_journal',icon:'📓',title:'First Daily Journal!',desc:'You completed your first daily journal entry. Reflection is where growth happens.',check:t=>{const keys=Object.keys(localStorage).filter(k=>k.startsWith('soa_dj_'+curUser+'_'));return keys.some(k=>{try{const d=JSON.parse(localStorage.getItem(k));return d.lessons||d.observations||d.satisfaction}catch{return false}})}},
+  {id:'first_journal',icon:'📓',title:'First Daily Journal!',desc:'You completed your first daily journal entry. Reflection is where growth happens.',check:t=>{return Object.values(_cachedJournals||{}).some(d=>d.lessons||d.observations||d.satisfaction)}},
   {id:'roadmap_25',icon:'🗺️',title:'25% Roadmap Complete!',desc:'Quarter of the SOA journey done. You\'re building a foundation.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=25}},
   {id:'roadmap_50',icon:'🛤️',title:'50% Roadmap Complete!',desc:'Halfway through the SOA system. The hardest part is behind you.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=50}},
   {id:'roadmap_100',icon:'🎓',title:'SOA Graduate!',desc:'100% of the roadmap complete. You\'ve mastered the entire SOA system.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&done===total}},
@@ -1833,8 +1860,8 @@ function chkMilestones(){
   saveMilestones(earned);
   if(newMilestone)showCelebration(newMilestone);
 }
-function getMilestones(){try{return JSON.parse(localStorage.getItem('soa_ms_'+curUser)||'{}')}catch{return{}}}
-function saveMilestones(m){localStorage.setItem('soa_ms_'+curUser,JSON.stringify(m))}
+function getMilestones(){return _cachedMilestones||{}}
+function saveMilestones(m){_cachedMilestones=m;Object.keys(m).forEach(id=>{api('POST','/api/milestones/'+id).catch(err=>console.error(err))})}
 
 function showCelebration(milestone){
   sendMilestoneToDiscord(milestone);
@@ -1969,11 +1996,11 @@ function showWtStep(){
 function endWalkthrough(){
   wtActive=false;
   document.querySelectorAll('.wt-overlay,.wt-backdrop,.wt-tooltip,.wt-highlight').forEach(e=>e.remove());
-  localStorage.setItem('soa_wt_'+curUser,'done');
+  if(!_cachedSettings)_cachedSettings={};_cachedSettings.walkthroughDone=true;api('POST','/api/settings',_cachedSettings).catch(err=>console.error(err));
 }
 
 function shouldShowWalkthrough(){
-  return !localStorage.getItem('soa_wt_'+curUser);
+  return !(_cachedSettings&&_cachedSettings.walkthroughDone);
 }
 
 
@@ -1992,9 +2019,7 @@ function checkJournalCompletion(date){
   // Need at least satisfaction + one other field
   if(hasSatisfaction&&(hasEmotions||hasLessons)){
     // Check if this is the first time completing this day
-    const completionKey='soa_jc_'+curUser+'_'+date;
-    if(localStorage.getItem(completionKey))return;
-    localStorage.setItem(completionKey,'1');
+    if(!_cachedSettings)_cachedSettings={};if(!_cachedSettings.journalCompletions)_cachedSettings.journalCompletions={};if(_cachedSettings.journalCompletions[date])return;_cachedSettings.journalCompletions[date]=true;api('POST','/api/settings',_cachedSettings).catch(err=>console.error(err));
     lastJournalCheck[date]=true;
     
     // Count journal streak (consecutive days with completed journals)
@@ -2182,8 +2207,8 @@ const ROADMAP_STEPS=[
 ];
 
 let expandedStep=null;
-function getRoadmapProgress(){try{return JSON.parse(localStorage.getItem('soa_roadmap_'+curUser)||'{}')}catch{return{}}}
-function saveRoadmapProgress(p){localStorage.setItem('soa_roadmap_'+curUser,JSON.stringify(p))}
+function getRoadmapProgress(){const p={};(_cachedRoadmap||[]).forEach(r=>{const step=ROADMAP_STEPS[r.step_index];if(step){if(!p[step.id])p[step.id]={};p[step.id][r.item_index]=true}});return p}
+function saveRoadmapProgress(p){const c=[];ROADMAP_STEPS.forEach((s,si)=>{if(p[s.id]){Object.keys(p[s.id]).forEach(ii=>{if(p[s.id][ii])c.push({step_index:si,item_index:parseInt(ii)})})}});_cachedRoadmap=c}
 
 let rmIntroPlayed=false;
 function rRoadmap(el){
@@ -2343,8 +2368,8 @@ function toggleRoadmapCheck(stepId,checkIdx){
 const DJ_EMOTIONS=['Calm','Confident','Focused','Patient','Satisfied','Excited','Anxious','Frustrated','Impatient','Overwhelmed','Distracted','Disappointed'];
 const DJ_BIASES=['Overtrading','Revenge Trading','FOMO','Impatience','Hesitation','Greed','Fear','Loss Aversion','Confirmation Bias','Anchoring Bias','Recency Bias','Sunk Cost Fallacy'];
 
-function getDJ(date){try{return JSON.parse(localStorage.getItem('soa_dj_'+curUser+'_'+date)||'{}')}catch{return{}}}
-function saveDJ(date,data){localStorage.setItem('soa_dj_'+curUser+'_'+date,JSON.stringify(data))}
+function getDJ(date){return _cachedJournals[date]||{}}
+
 
 function rJournal(el){
   if(!journalDate){sv('calendar');return}
@@ -2538,8 +2563,7 @@ function generateDailyAI(dayTrades,dj){
 }
 
 // ═══ RISK PLAN ═══
-function getRiskPlan(){try{return JSON.parse(localStorage.getItem('soa_risk_'+curUser)||'{}')}catch{return{}}}
-function saveRiskPlan(r){localStorage.setItem('soa_risk_'+curUser,JSON.stringify(r))}
+
 function updateRisk(field,val){const r=getRiskPlan();r[field]=val;saveRiskPlan(r)}
 
 function rRisk(el){
@@ -2740,7 +2764,7 @@ function rSettings(el){
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px">
           <div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Journal Walkthrough</div><div style="font-size:11px;color:var(--text-muted)">Replay the guided tour of all features</div></div>
-          <button class="btn-sm" onclick="localStorage.removeItem('soa_wt_'+curUser);startWalkthrough()">Restart Tour</button>
+          <button class="btn-sm" onclick="if(!_cachedSettings)_cachedSettings={};_cachedSettings.walkthroughDone=false;api('POST','/api/settings',_cachedSettings);startWalkthrough()">Restart Tour</button>
         </div>
     </div>
 
@@ -2895,9 +2919,7 @@ function deleteAccount(){
   if(!confirm('Last chance — type OK in the next prompt to confirm.'))return;
   const conf=prompt('Type DELETE to confirm account deletion:');
   if(conf!=='DELETE'){alert('Account deletion cancelled.');return}
-  localStorage.removeItem(tK());
-  localStorage.removeItem('soa_b_'+curUser);
-  localStorage.removeItem('soa_ms_'+curUser);
+  trades=[];_cachedBadges={};_cachedMilestones={};
   const users=gUsers();delete users[curUser];sUsers(users);
   handleLogout();
 }
@@ -3362,19 +3384,10 @@ function removeReviewScreenshot(tradeIdx,imgIdx){
   showReviewSlide();
 }
 
-function checkStorageUsage(){
-  let total=0;
-  for(let i=0;i<localStorage.length;i++){
-    const key=localStorage.key(i);
-    total+=localStorage.getItem(key).length;
-  }
-  const pct=(total/(5*1024*1024)*100);
-  if(pct>80)console.warn('localStorage usage: '+pct.toFixed(1)+'%');
-  return pct;
-}
+function checkStorageUsage(){return 0;}
 
 function saveCurrentReview(){const t=reviewData[reviewIndex];const emo=document.getElementById('rv-emo');if(emo)t.emotionRating=parseInt(emo.value);const notes=document.getElementById('rv-notes');if(notes)t.notes=notes.value}
-function finishImport(){let imported=0,skipped=0;const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:'csv'});imported++});svTr();chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
+function finishImport(){let imported=0,skipped=0;const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
 
 // ─── TRADE MODAL ───
 function openModal(tr){editId=tr?tr.id:null;document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';rSOA();switchModalTab('trade');document.getElementById('tradeModal').classList.add('active')}
@@ -3391,9 +3404,9 @@ function tgStrat(s){if(fSetup.includes(s))fSetup=fSetup.filter(x=>x!==s);else fS
 function tgRule(i){const r=RL[i];if(fRules.includes(r))fRules=fRules.filter(x=>x!==r);else fRules.push(r)}
 function saveTrade(){const t={id:editId||gId(),date:document.getElementById('f-date').value,instrument:document.getElementById('f-instrument').value,ticker:document.getElementById('f-ticker').value,direction:fDir,entryPrice:document.getElementById('f-entry').value,exitPrice:document.getElementById('f-exit').value,quantity:document.getElementById('f-qty').value,stopLoss:document.getElementById('f-sl').value,pnl:Number(document.getElementById('f-pnl').value)||0,fees:Number(document.getElementById('f-fees').value)||0,strategy:fSetup.join(' + ')||'No Strategy Used',emotionRating:fEmoRating,rulesFollowed:[...fRules],notes:document.getElementById('f-notes').value};if(editId)trades=trades.map(x=>x.id===editId?{...t,totw:x.totw}:x);else trades.push(t);svTr();chkBdg();chkMilestones();closeModal();ren()}
 function editTr(id){const t=trades.find(x=>x.id===id);if(t)openModal(t)}
-function delTr(id){if(!confirm('Delete this trade?'))return;trades=trades.filter(t=>t.id!==id);svTr();ren()}
+function delTr(id){if(!confirm('Delete this trade?'))return;trades=trades.filter(t=>t.id!==id);api('DELETE','/api/trades/'+id).catch(err=>console.error(err));ren()}
 
-(function(){const s=localStorage.getItem('soa_cur');if(s){const u=gUsers();if(u[s]){loginAs(s);return}}document.getElementById('loginScreen').style.display='flex';updateTickers()})();
+(function(){const savedToken=localStorage.getItem('soa_token');if(savedToken){authToken=savedToken;api('GET','/api/auth/me').then(data=>{loginAs(data.user.username,data.user.is_mentor)}).catch(()=>{localStorage.removeItem('soa_token');authToken=null;document.getElementById('loginScreen').style.display='flex';updateTickers()})}else{document.getElementById('loginScreen').style.display='flex';updateTickers()}})();
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin()});
 document.getElementById('regConfirm').addEventListener('keydown',e=>{if(e.key==='Enter')handleRegister()});
 

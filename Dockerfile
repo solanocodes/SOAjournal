@@ -1,6 +1,13 @@
-FROM nginx:alpine
+FROM node:20-alpine
 
-COPY site/ /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY src/ ./src/
+COPY site/ ./site/
 
 EXPOSE 8080
+
+CMD ["node", "src/server.js"]
