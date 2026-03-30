@@ -874,7 +874,7 @@ async function api(method,path,body){
   return data;
 }
 let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRoadmap=[],_cachedRiskPlan={},_cachedSettings={};
-let _cachedStudents=[],_studentsLoaded=false;
+let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
 async function loadAllData(){
   try{
@@ -1524,7 +1524,14 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
   if(!_studentsLoaded){el.innerHTML='<div class="empty-state fade-up"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading students...</h3></div>';api('GET','/api/mentor/students').then(data=>{_cachedStudents=data||[];_studentsLoaded=true;ren()}).catch(err=>{console.error(err);el.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><h3 class="empty-title">Failed to load students</h3></div>'});return}
   if(!_cachedStudents.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">👥</div><h3 class="empty-title">No students yet</h3></div>`;return}
   let h='<h3 style="font-size:18px;font-weight:700;margin-bottom:20px" class="fade-up">★ Mentor Panel</h3><div class="mentor-student-list">';
-  _cachedStudents.forEach((s,i)=>{const isV=mViewUser===s.username;h+=`<div class="mentor-student-row${isV?' active':''} fade-up stagger-${Math.min(i+1,8)}" onclick="mViewUser=mViewUser==='${s.username}'?null:'${s.username}';ren()"><div><div class="mentor-student-name">${esc(s.username)}</div></div><div class="mentor-student-stats"><span>${s.tradeCount} trades</span>${s.tradeCount>0?`<span style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'}">${f$(s.totalPnl)}</span><span>${s.winRate.toFixed(0)}% WR</span><span>${s.avgEmotion.toFixed(1)} emo</span>`:'<span style="color:var(--text-muted)">No trades yet</span>'}</div></div>`;if(isV){h+=`<div class="fade-in" style="margin-bottom:16px"><div class="stats-grid" style="margin:12px 0"><div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-value" style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'};font-size:20px">${f$(s.totalPnl)}</div></div><div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" style="font-size:20px">${s.winRate.toFixed(1)}%</div></div><div class="stat-card"><div class="stat-label">Avg Emotion</div><div class="stat-value" style="font-size:20px">${s.avgEmotion.toFixed(1)}/10</div></div><div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-value" style="font-size:20px">${s.tradeCount}</div></div></div>${s.lastTradeDate?`<div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-bottom:12px">Last trade: ${fD(s.lastTradeDate)}</div>`:''}</div>`}});
+  _cachedStudents.forEach((s,i)=>{const isV=mViewUser===s.username;h+=`<div class="mentor-student-row${isV?' active':''} fade-up stagger-${Math.min(i+1,8)}" onclick="mViewUser=mViewUser==='${s.username}'?null:'${s.username}';if(mViewUser)loadStuDetail('${s.id}','${s.username}');ren()"><div><div class="mentor-student-name">${esc(s.username)}</div></div><div class="mentor-student-stats"><span>${s.tradeCount} trades</span>${s.tradeCount>0?`<span style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'}">${f$(s.totalPnl)}</span><span>${s.winRate.toFixed(0)}% WR</span><span>${s.avgEmotion.toFixed(1)} emo</span>`:'<span style="color:var(--text-muted)">No trades yet</span>'}</div></div>`;
+    if(isV){
+      const det=_cachedStudentDetail[s.username];
+      h+=`<div class="fade-in" style="margin-bottom:16px"><div class="stats-grid" style="margin:12px 0"><div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-value" style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'};font-size:20px">${f$(s.totalPnl)}</div></div><div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" style="font-size:20px">${s.winRate.toFixed(1)}%</div></div><div class="stat-card"><div class="stat-label">Avg Emotion</div><div class="stat-value" style="font-size:20px">${s.avgEmotion.toFixed(1)}/10</div></div><div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-value" style="font-size:20px">${s.tradeCount}</div></div></div>`;
+      if(det){h+=buildStudentCal(det.trades,s.username)}else{h+=`<div style="text-align:center;padding:20px;font-family:var(--mono);font-size:12px;color:var(--text-muted)">Loading calendar...</div>`}
+      h+=`</div>`;
+    }
+  });
   h+='</div>';
   // If filtering by date, show Daily Journal below trades
   if(filterDate){
@@ -1575,6 +1582,14 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
     </div>`;
   }
   el.innerHTML=h}
+function loadStuDetail(id,username){if(_cachedStudentDetail[username])return;api('GET','/api/mentor/student/'+id).then(data=>{_cachedStudentDetail[username]=data;const now=new Date();_stuCalY[username]=now.getFullYear();_stuCalM[username]=now.getMonth();ren()}).catch(err=>console.error(err))}
+
+function buildStudentCal(stuTrades,username){const now=new Date();const y=_stuCalY[username]||now.getFullYear();const m=_stuCalM[username]??now.getMonth();const fi=new Date(y,m,1),la=new Date(y,m+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};stuTrades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;c+=`<div class="cal-day ${h?(p>=0?'green':'red'):''}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:''}</div>`}
+  const prevM=`stuCalNav('${username}',-1)`;const nextM=`stuCalNav('${username}',1)`;
+  return`<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px"><div class="cal-nav" style="margin-bottom:10px"><button class="cal-nav-btn" onclick="${prevM}">◀</button><h3 class="cal-month">${mn}</h3><button class="cal-nav-btn" onclick="${nextM}">▶</button></div><div class="cal-grid">${c}</div></div>`}
+
+function stuCalNav(username,dir){if(_stuCalM[username]===undefined){const n=new Date();_stuCalM[username]=n.getMonth();_stuCalY[username]=n.getFullYear()}_stuCalM[username]+=dir;if(_stuCalM[username]>11){_stuCalM[username]=0;_stuCalY[username]++}if(_stuCalM[username]<0){_stuCalM[username]=11;_stuCalY[username]--}ren()}
+
 function mTotw(u,id){trades=trades.map(t=>({...t,totw:t.id===id?!t.totw:(t.totw||false)}));ren()}
 function pCmt(id){const el=document.getElementById('mc-'+id);if(!el||!el.value.trim())return;sCmt(id,{a:curUser,t:el.value.trim(),d:new Date().toISOString()});ren()}
 
