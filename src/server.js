@@ -19,8 +19,9 @@ app.use(express.static(path.join(__dirname, '..', 'site')));
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, firstName, lastName } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+    if (!firstName || !lastName) return res.status(400).json({ error: 'First and last name required' });
     if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
     if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
@@ -30,12 +31,12 @@ app.post('/api/auth/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const isMentor = username.toLowerCase() === 'seansolano';
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, is_mentor) VALUES ($1, $2, $3) RETURNING id, username, is_mentor',
-      [username, hash, isMentor]
+      'INSERT INTO users (username, password_hash, is_mentor, first_name, last_name) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, is_mentor, first_name, last_name',
+      [username, hash, isMentor, firstName.trim(), lastName.trim()]
     );
     const user = result.rows[0];
     const token = generateToken(user);
-    res.json({ token, user: { id: user.id, username: user.username, is_mentor: user.is_mentor } });
+    res.json({ token, user: { id: user.id, username: user.username, is_mentor: user.is_mentor, firstName: user.first_name, lastName: user.last_name } });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -349,7 +350,7 @@ app.post('/api/settings', authMiddleware, async (req, res) => {
 app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const students = await pool.query(
-      `SELECT u.id, u.username, u.created_at,
+      `SELECT u.id, u.username, u.first_name, u.last_name, u.created_at,
         (SELECT COUNT(*) FROM trades t WHERE t.user_id = u.id) as trade_count,
         (SELECT COALESCE(SUM(t.pnl), 0) FROM trades t WHERE t.user_id = u.id) as total_pnl,
         (SELECT COUNT(*) FROM trades t WHERE t.user_id = u.id AND t.pnl > 0) as wins,
@@ -359,7 +360,7 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
        FROM users u WHERE u.is_mentor = FALSE ORDER BY u.username`
     );
     const result = students.rows.map(s => ({
-      id: s.id, username: s.username, createdAt: s.created_at,
+      id: s.id, username: s.username, firstName: s.first_name||'', lastName: s.last_name||'', fullName: s.first_name&&s.last_name?s.first_name+' '+s.last_name:s.username, createdAt: s.created_at,
       tradeCount: parseInt(s.trade_count), totalPnl: parseFloat(s.total_pnl),
       wins: parseInt(s.wins), winRate: s.trade_count > 0 ? (s.wins / s.trade_count * 100) : 0,
       lastTradeDate: s.last_trade_date, lastJournalDate: s.last_journal_date,

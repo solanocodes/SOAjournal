@@ -119,6 +119,10 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Name columns (added later, safe to re-run)
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(50) DEFAULT '';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(50) DEFAULT '';
+
       -- Pre-market columns (added later, safe to re-run)
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_bias VARCHAR(20) DEFAULT '';
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_mental_state INTEGER DEFAULT 0;
