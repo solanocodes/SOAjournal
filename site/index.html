@@ -920,7 +920,7 @@ let RT_FEES={...DEFAULT_RT_FEES};
 function refreshFees(){RT_FEES={...DEFAULT_RT_FEES,...getUserRT()}}
 
 // ═══ DISCORD WEBHOOKS ═══
-const DISCORD_WEBHOOK='https://discord.com/api/webhooks/1486817423146619080/OfibCXR9lHlJgmKeZ57E7awC1vSzsjdAdLO_ngXNh3HiA9GVVIs3pnnIFTU3pm9-k084';
+const DISCORD_WEBHOOKS=['https://discord.com/api/webhooks/1486817423146619080/OfibCXR9lHlJgmKeZ57E7awC1vSzsjdAdLO_ngXNh3HiA9GVVIs3pnnIFTU3pm9-k084','https://discord.com/api/webhooks/1488331466445160572/pDBn-ljENFTB3z66sxmRXBVRUzrF0KGzprXpuJtZB2_44LKIaBzQOwIOO6St1s_D5eT5'];
 
 
 function shareToDiscord(type,data){
@@ -966,11 +966,7 @@ function shareToDiscord(type,data){
     };
   }
   
-  fetch(DISCORD_WEBHOOK,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({embeds:[embed]})
-  }).then(r=>{
+  Promise.all(DISCORD_WEBHOOKS.map(url=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({embeds:[embed]})}))).then(()=>{
     if(btn){btn.innerHTML='<span class="btn-export-icon">✅</span> Shared!';setTimeout(()=>{btn.innerHTML='<span class="btn-export-icon">🚀</span> Share to Discord'},2000)}
   }).catch(err=>{
     console.error('Discord share error:',err);
@@ -979,11 +975,7 @@ function shareToDiscord(type,data){
 }
 
 function sendDiscord(payload){
-  fetch(DISCORD_WEBHOOK,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  }).catch(err=>console.log('Discord webhook error:',err));
+  DISCORD_WEBHOOKS.forEach(url=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(err=>console.log('Discord webhook error:',err)));
 }
 
 function sendMilestoneToDiscord(milestone){
