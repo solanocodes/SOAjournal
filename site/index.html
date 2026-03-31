@@ -987,17 +987,11 @@ function sendDiscord(payload){
 }
 
 function sendMilestoneToDiscord(milestone){
-  const s=cStats(trades);
   sendDiscord({
     embeds:[{
       title:curUser.toUpperCase()+' just hit a milestone!',
       description:milestone.icon+' **'+milestone.title+'**\n'+milestone.desc,
       color:3066993,
-      fields:[
-        {name:'Total P&L',value:'**'+f$(s.np)+'**',inline:true},
-        {name:'Win Rate',value:'**'+s.wr.toFixed(1)+'%**',inline:true},
-        {name:'Total Trades',value:'**'+String(s.tot)+'**',inline:true}
-      ],
       footer:{text:curUser+' · SOA Trading Journal'},
       timestamp:new Date().toISOString()
     }]
