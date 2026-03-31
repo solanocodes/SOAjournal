@@ -19,9 +19,10 @@ app.use(express.static(path.join(__dirname, '..', 'site')));
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password, firstName, lastName } = req.body;
+    const { username, password, firstName, lastName, securityQuestion, securityAnswer } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
     if (!firstName || !lastName) return res.status(400).json({ error: 'First and last name required' });
+    if (!securityQuestion || !securityAnswer) return res.status(400).json({ error: 'Security question and answer required' });
     if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
     if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
@@ -30,9 +31,10 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     const isMentor = username.toLowerCase() === 'seansolano';
+    const answerHash = await bcrypt.hash(securityAnswer.trim().toLowerCase(), 10);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, is_mentor, first_name, last_name) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, is_mentor, first_name, last_name',
-      [username, hash, isMentor, firstName.trim(), lastName.trim()]
+      'INSERT INTO users (username, password_hash, is_mentor, first_name, last_name, security_question, security_answer) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, is_mentor, first_name, last_name',
+      [username, hash, isMentor, firstName.trim(), lastName.trim(), securityQuestion.trim(), answerHash]
     );
     const user = result.rows[0];
     const token = generateToken(user);
@@ -57,6 +59,37 @@ app.post('/api/auth/login', async (req, res) => {
     res.json({ token, user: { id: user.id, username: user.username, is_mentor: user.is_mentor } });
   } catch (err) {
     console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/auth/security-question', async (req, res) => {
+  try {
+    const { username } = req.body;
+    const result = await pool.query('SELECT security_question FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Account not found' });
+    const q = result.rows[0].security_question;
+    if (!q) return res.status(400).json({ error: 'No security question set for this account' });
+    res.json({ question: q });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { username, securityAnswer, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    const result = await pool.query('SELECT id, security_answer FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Account not found' });
+    const user = result.rows[0];
+    if (!user.security_answer) return res.status(400).json({ error: 'No security question set for this account' });
+    const valid = await bcrypt.compare(securityAnswer.trim().toLowerCase(), user.security_answer);
+    if (!valid) return res.status(401).json({ error: 'Incorrect answer' });
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });

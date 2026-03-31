@@ -119,6 +119,10 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Security question columns (added later, safe to re-run)
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(255) DEFAULT '';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer VARCHAR(255) DEFAULT '';
+
       -- Name columns (added later, safe to re-run)
       ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(50) DEFAULT '';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(50) DEFAULT '';
