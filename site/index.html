@@ -3182,15 +3182,50 @@ function getProductFromContract(contract){
 }
 
 function parseTopStepX(rows){
+  // Format A: Pre-computed round-trip trades (newer Topstep export)
+  // Columns: Id, ContractName, EnteredAt, ExitedAt, EntryPrice, ExitPrice, Fees, PnL, Size, Type, TradeDay, TradeDuration, Commissions
+  if(rows.length&&rows[0].hasOwnProperty('EntryPrice')&&rows[0].hasOwnProperty('ExitPrice')&&rows[0].hasOwnProperty('PnL')){
+    const rts=[];
+    rows.forEach(r=>{
+      const entryPrice=parseFloat(r['EntryPrice']||'0');
+      const exitPrice=parseFloat(r['ExitPrice']||'0');
+      const pnl=parseFloat(r['PnL']||'0');
+      const fees=parseFloat(r['Fees']||'0')+(parseFloat(r['Commissions']||'0'));
+      const qty=parseInt(r['Size']||'1');
+      const direction=(r['Type']||'Long');
+      const contract=r['ContractName']||'';
+      const product=getProductFromContract(contract);
+      // Parse date from TradeDay "03/24/2026 00:00:00 -05:00" or EnteredAt
+      const tradeDay=r['TradeDay']||r['EnteredAt']||'';
+      let date='';
+      const dm=tradeDay.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if(dm)date=dm[3]+'-'+dm[1]+'-'+dm[2];
+      if(!date)date=new Date().toISOString().slice(0,10);
+      // Net PnL = PnL from CSV already includes the trade result, fees are separate
+      const grossPnl=pnl;
+      const netPnl=pnl-fees;
+      rts.push({
+        date,product,contract:contract||product,direction,
+        entryPrice:entryPrice.toFixed(6).replace(/\.?0+$/,''),
+        exitPrice:exitPrice.toFixed(6).replace(/\.?0+$/,''),
+        quantity:qty,grossPnl:Math.round(grossPnl*100)/100,
+        fees:Math.round(fees*100)/100,pnl:Math.round(netPnl*100)/100,
+        strategies:[],emotionRating:7,rulesFollowed:[],notes:''
+      });
+    });
+    return rts;
+  }
+
+  // Format B: Order-level data (older TopStepX export)
+  // Columns: Status, ExecutePrice, ContractName, Size, Side, PositionDisposition, TradeDay, FilledAt
   const filled=rows.filter(r=>r['Status']==='Filled'&&r['ExecutePrice']);
   if(!filled.length)return[];
-  
+
   filled.sort((a,b)=>(a['FilledAt']||'').localeCompare(b['FilledAt']||''));
-  
+
   const rts=[];
-  // Group by contract and match Opening/Closing pairs
   const opens=[];
-  
+
   filled.forEach(o=>{
     const product=getProductFromContract(o['ContractName']||'');
     const qty=parseInt(o['Size']||'1');
@@ -3198,18 +3233,15 @@ function parseTopStepX(rows){
     const side=(o['Side']||'').toLowerCase();
     const disposition=(o['PositionDisposition']||'').toLowerCase();
     const tradeDay=o['TradeDay']||o['FilledAt']||'';
-    // Parse date - handle "03/22/2026 19:24:22 -08:00" format
     let date='';
     const dateMatch=tradeDay.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if(dateMatch)date=dateMatch[3]+'-'+dateMatch[1]+'-'+dateMatch[2];
-    
-    // In TopStepX: Ask=Sell, Bid=Buy
+
     const isBuy=side==='bid';
-    
+
     if(disposition==='opening'){
       opens.push({product,qty,price,isBuy,date,contract:o['ContractName']||product});
     }else if(disposition==='closing'&&opens.length){
-      // Find matching open
       const openIdx=opens.findIndex(op=>op.product===product);
       if(openIdx>=0){
         const open=opens[openIdx];
@@ -3231,8 +3263,7 @@ function parseTopStepX(rows){
       }
     }
   });
-  
-  // Fallback: if no Opening/Closing tags, match buys and sells manually
+
   if(!rts.length&&filled.length>=2){
     const byProduct={};
     filled.forEach(o=>{
@@ -3249,7 +3280,7 @@ function parseTopStepX(rows){
         const signed=isBuy?qty:-qty;
         const tradeDay=o['TradeDay']||o['FilledAt']||'';
         let date='';const dm=tradeDay.match(/(\d{2})\/(\d{2})\/(\d{4})/);if(dm)date=dm[3]+'-'+dm[1]+'-'+dm[2];
-        
+
         if(pos===0){entries=[{qty,price,isBuy}];pos=signed}
         else if((pos>0&&!isBuy)||(pos<0&&isBuy)){
           const closeQty=Math.min(Math.abs(pos),qty);
@@ -3266,7 +3297,7 @@ function parseTopStepX(rows){
       });
     });
   }
-  
+
   return rts;
 }
 
@@ -3368,7 +3399,7 @@ function parseWebull(rows){
 
 function handleImportFile(file){if(!file)return;const status=document.getElementById('importStatus');if(!file.name.toLowerCase().endsWith('.csv')){status.innerHTML='<div class="import-status error">Please upload a .csv file</div>';return}const reader=new FileReader();reader.onload=function(e){try{const rows=parseCSV(e.target.result);if(!rows.length){status.innerHTML='<div class="import-status error">No data found</div>';return}const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'auto';
       const hasBS=rows[0].hasOwnProperty('B/S');const hasContract=rows[0].hasOwnProperty('Contract');
-      const hasTopStep=rows[0].hasOwnProperty('PositionDisposition')||rows[0].hasOwnProperty('ContractName')&&rows[0].hasOwnProperty('Side');
+      const hasTopStep=rows[0].hasOwnProperty('PositionDisposition')||(rows[0].hasOwnProperty('ContractName')&&rows[0].hasOwnProperty('Side'))||(rows[0].hasOwnProperty('EntryPrice')&&rows[0].hasOwnProperty('ExitPrice')&&rows[0].hasOwnProperty('PnL'));
       
       if(broker==='topstepx'||(!hasBS&&hasTopStep)){
         // TopStepX format
@@ -3470,7 +3501,7 @@ function removeReviewScreenshot(tradeIdx,imgIdx){
 function checkStorageUsage(){return 0;}
 
 function saveCurrentReview(){const t=reviewData[reviewIndex];const emo=document.getElementById('rv-emo');if(emo)t.emotionRating=parseInt(emo.value);const notes=document.getElementById('rv-notes');if(notes)t.notes=notes.value}
-function finishImport(){let imported=0,skipped=0;const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
+function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
 
 // ─── TRADE MODAL ───
 function openModal(tr){editId=tr?tr.id:null;document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';rSOA();switchModalTab('trade');document.getElementById('tradeModal').classList.add('active')}
