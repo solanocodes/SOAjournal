@@ -153,14 +153,24 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
 app.post('/api/trades/bulk', authMiddleware, async (req, res) => {
   try {
     const trades = req.body.trades || [];
+    const upsert = req.body.upsert || false;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       for (const t of trades) {
+        const conflictClause = upsert
+          ? `ON CONFLICT (id) DO UPDATE SET
+              date=EXCLUDED.date, instrument=EXCLUDED.instrument, ticker=EXCLUDED.ticker,
+              direction=EXCLUDED.direction, entry_price=EXCLUDED.entry_price, exit_price=EXCLUDED.exit_price,
+              quantity=EXCLUDED.quantity, stop_loss=EXCLUDED.stop_loss, pnl=EXCLUDED.pnl,
+              fees=EXCLUDED.fees, gross_pnl=EXCLUDED.gross_pnl, strategy=EXCLUDED.strategy,
+              emotion_rating=EXCLUDED.emotion_rating, rules_followed=EXCLUDED.rules_followed,
+              notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from`
+          : `ON CONFLICT (id) DO NOTHING`;
         await client.query(
           `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-           ON CONFLICT (id) DO NOTHING`,
+           ${conflictClause}`,
           [t.id, req.user.id, t.date, t.instrument||'futures', t.ticker, t.direction,
            t.entryPrice||'', t.exitPrice||'', t.quantity||'1', t.stopLoss||'',
            t.pnl||0, t.fees||0, t.grossPnl||t.pnl||0, t.strategy||'No Strategy Used',
