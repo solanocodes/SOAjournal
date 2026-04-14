@@ -1184,10 +1184,10 @@ function rDash(el){
 }
 
 // ─── CALENDAR ───
-function rCal(el){const fi=new Date(calY,calM,1),la=new Date(calY,calM+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;const jd=getDJ(k);const hasJournal=jd.satisfaction||jd.lessons||jd.observations||(jd.emotions&&jd.emotions.length);const hasPM=jd.pmBias||jd.pmLevels||jd.pmGoals;c+=`<div class="cal-day ${h?(p>=0?'green clickable':'red clickable'):'pre-clickable'}${hasJournal?' journaled':''}" onclick="${h?`filterDate='${k}';sv('trades')`:`openPreMarket('${k}')`}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:`${hasPM?'<span class="cal-pm-dot">PM ✓</span>':''}`}</div>`}el.innerHTML=`<div class="cal-nav fade-up"><button class="cal-nav-btn" onclick="calM--;if(calM<0){calM=11;calY--}ren()">◀</button><h3 class="cal-month">${mn}</h3><button class="cal-nav-btn" onclick="calM++;if(calM>11){calM=0;calY++}ren()">▶</button></div><div class="cal-grid fade-up" style="animation-delay:.1s">${c}</div><div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-muted);opacity:.7">Click a trading day for post-session journal · Click an empty day for pre-market plan</div>`}
+function rCal(el){const fi=new Date(calY,calM,1),la=new Date(calY,calM+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;const jd=getDJ(k);const hasJournal=jd.satisfaction||jd.lessons||jd.observations||(jd.emotions&&jd.emotions.length);const hasPM=jd.pmBias||jd.pmLevels||jd.pmGoals;const _now=new Date();_now.setHours(0,0,0,0);const isPast=new Date(calY,calM,d)<=_now;c+=`<div class="cal-day ${h?(p>=0?'green clickable':'red clickable'):(isPast?'clickable':'pre-clickable')}${hasJournal?' journaled':''}" onclick="${h||isPast?`filterDate='${k}';sv('trades')`:`openPreMarket('${k}')`}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:`${hasPM?'<span class="cal-pm-dot">PM ✓</span>':''}`}</div>`}el.innerHTML=`<div class="cal-nav fade-up"><button class="cal-nav-btn" onclick="calM--;if(calM<0){calM=11;calY--}ren()">◀</button><h3 class="cal-month">${mn}</h3><button class="cal-nav-btn" onclick="calM++;if(calM>11){calM=0;calY++}ren()">▶</button></div><div class="cal-grid fade-up" style="animation-delay:.1s">${c}</div><div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-muted);opacity:.7">Click any day to journal · Future empty days open pre-market plan</div>`}
 
 // ─── TRADE LIST ───
-function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[...trades];fi.sort((a,b)=>new Date(b.date)-new Date(a.date));let h='';if(filterDate)h+=`<div class="filter-bar"><span>Trades for ${fD(filterDate)}</span><button class="btn-sm" onclick="filterDate=null;ren()">Show all</button></div>`;if(!fi.length){h+=`<div class="empty-state fade-up"><div class="empty-icon">📝</div><h3 class="empty-title">${filterDate?'No trades this day':'No trades yet'}</h3><p class="empty-text">Click "+ New Trade" or "Import CSV"</p></div>`;el.innerHTML=h;return}h+='<div class="trade-list">';fi.forEach((t,i)=>{const tw=t.totw;const strat=t.strategy||t.setupQuality||'';const emoR=t.emotionRating||5;h+=`<div class="trade-row${tw?' totw':''} fade-up stagger-${Math.min(i+1,8)}">${tw?'<div class="totw-badge">⭐ TRADE OF THE WEEK</div>':''}<div class="trade-row-left"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'}</div><div><div><span class="trade-ticker">${esc(t.ticker)}</span><span class="trade-inst">${esc(t.instrument)}</span></div><div class="trade-date">${fD(t.date)}</div></div></div><div class="trade-row-center"><span class="tag tag-setup">${esc(strat)}</span><span class="tag tag-emotion" style="color:${emoColor(emoR)}">Emotion: ${emoR}/10</span></div><div class="trade-row-right"><div class="trade-pnl" style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div><div class="trade-rules-ct">${(t.rulesFollowed||[]).length}/${RL.length} rules</div></div><div class="trade-row-actions">${(t.screenshots&&t.screenshots.length)?`<span style="font-size:10px;color:var(--text-muted)">📷${t.screenshots.length}</span>`:''}<button class="btn-icon edit" onclick="editTr('${t.id}')">✎</button><button class="btn-icon del" onclick="delTr('${t.id}')">✕</button></div></div>`;const cm=gCmt(t.id);if(cm.length){h+=`<div style="margin:-4px 0 8px 46px"><div class="comment-list">${cm.map(c=>`<div class="comment-item"><div class="comment-author">★ ${esc(c.a)}</div><div class="comment-text">${esc(c.t)}</div><div class="comment-time">${fD(c.d)}</div></div>`).join('')}</div></div>`}});h+='</div>';
+function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[...trades];fi.sort((a,b)=>new Date(b.date)-new Date(a.date));let h='';if(filterDate)h+=`<div class="filter-bar"><span>Trades for ${fD(filterDate)}</span><button class="btn-sm" onclick="filterDate=null;ren()">Show all</button></div>`;if(!fi.length&&!filterDate){h+=`<div class="empty-state fade-up"><div class="empty-icon">📝</div><h3 class="empty-title">No trades yet</h3><p class="empty-text">Click "+ New Trade" or "Import CSV"</p></div>`;el.innerHTML=h;return}if(!fi.length&&filterDate){h+=`<div class="card fade-up" style="text-align:center;padding:24px"><div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--text-primary)">No trades on ${fD(filterDate)}</div><div style="font-family:var(--mono);font-size:12px;color:var(--text-muted);margin-bottom:14px">Choosing not to trade is still a decision worth journaling</div><div style="display:flex;gap:8px;justify-content:center"><button class="btn-sm" onclick="openPreMarket('${filterDate}')">📋 Pre-Market Plan</button></div></div>`}if(fi.length){h+='<div class="trade-list">';fi.forEach((t,i)=>{const tw=t.totw;const strat=t.strategy||t.setupQuality||'';const emoR=t.emotionRating||5;h+=`<div class="trade-row${tw?' totw':''} fade-up stagger-${Math.min(i+1,8)}">${tw?'<div class="totw-badge">⭐ TRADE OF THE WEEK</div>':''}<div class="trade-row-left"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'}</div><div><div><span class="trade-ticker">${esc(t.ticker)}</span><span class="trade-inst">${esc(t.instrument)}</span></div><div class="trade-date">${fD(t.date)}</div></div></div><div class="trade-row-center"><span class="tag tag-setup">${esc(strat)}</span><span class="tag tag-emotion" style="color:${emoColor(emoR)}">Emotion: ${emoR}/10</span></div><div class="trade-row-right"><div class="trade-pnl" style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div><div class="trade-rules-ct">${(t.rulesFollowed||[]).length}/${RL.length} rules</div></div><div class="trade-row-actions">${(t.screenshots&&t.screenshots.length)?`<span style="font-size:10px;color:var(--text-muted)">📷${t.screenshots.length}</span>`:''}<button class="btn-icon edit" onclick="editTr('${t.id}')">✎</button><button class="btn-icon del" onclick="delTr('${t.id}')">✕</button></div></div>`;const cm=gCmt(t.id);if(cm.length){h+=`<div style="margin:-4px 0 8px 46px"><div class="comment-list">${cm.map(c=>`<div class="comment-item"><div class="comment-author">★ ${esc(c.a)}</div><div class="comment-text">${esc(c.t)}</div><div class="comment-time">${fD(c.d)}</div></div>`).join('')}</div></div>`}});h+='</div>'}
   // If filtering by date, show Daily Journal below trades
   if(filterDate){
     const dayTrades=trades.filter(t=>dKey(t.date)===filterDate);
@@ -1205,34 +1205,34 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
     const selBiases=dj.biases||[];
     const biasChips=DJ_BIASES.map(b=>`<div class="dj-chip warn${selBiases.includes(b)?' selected':''}" onclick="toggleDJChip('${filterDate}','biases','${b}')">${b}</div>`).join('');
     const aiAnalysis=generateDailyAI(dayTrades,dj);
-    
+
     h+=`<div style="margin-top:28px;padding-top:24px;border-top:2px solid var(--border)">
       <div style="text-align:center;margin-bottom:24px">
         <div style="font-size:18px;font-weight:800;margin-bottom:4px">📓 Daily Journal — ${fD(filterDate)}</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">Review your day, reflect on your decisions, and plan for tomorrow</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${dayTrades.length?'Review your day, reflect on your decisions, and plan for tomorrow':'No trades today — reflect on your decision to stay flat and plan ahead'}</div>
       </div>
-      
-      <div class="dj-summary" style="margin-bottom:24px">
+
+      ${dayTrades.length?`<div class="dj-summary" style="margin-bottom:24px">
         <div class="dj-summary-item"><div class="dj-summary-val" style="color:${tp>=0?'var(--green)':'var(--red)'}">${f$(tp)}</div><div class="dj-summary-label">Net P&L</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val">${wr.toFixed(1)}%</div><div class="dj-summary-label">Win Rate</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val">${wins} / ${losses}</div><div class="dj-summary-label">W / L</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val"><span style="color:var(--green)">${f$(avgWin)}</span> / <span style="color:var(--red)">${f$(avgLoss)}</span></div><div class="dj-summary-label">Avg W/L</div></div>
-      </div>
-      
-      <div class="dj-section"><div class="dj-section-title">⭐ Trading Satisfaction</div><div class="dj-stars">${starHTML}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai">${aiAnalysis}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">😤 Post-Trading Emotions</div><div class="dj-chips">${emoChips}</div></div>
-      
+      </div>`:''}
+
+      <div class="dj-section"><div class="dj-section-title">⭐ ${dayTrades.length?'Trading':'Daily'} Satisfaction</div><div class="dj-stars">${starHTML}</div></div>
+
+      ${dayTrades.length?`<div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai">${aiAnalysis}</div></div>`:''}
+
+      <div class="dj-section"><div class="dj-section-title">😤 ${dayTrades.length?'Post-Trading ':''}Emotions</div><div class="dj-chips">${emoChips}</div></div>
+
       <div class="dj-section"><div class="dj-section-title">⚠️ Emotional Biases Experienced</div><div class="dj-chips">${biasChips}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">📝 Lessons Learned</div><textarea class="dj-textarea" placeholder="What did you learn from today's trades? What would you do differently?" oninput="saveDJText('${filterDate}','lessons',this.value)">${esc(dj.lessons||'')}</textarea></div>
-      
-      <div class="dj-section"><div class="dj-section-title">👁️ Observations</div><textarea class="dj-textarea" placeholder="What patterns or behaviors did you notice today?" oninput="saveDJText('${filterDate}','observations',this.value)">${esc(dj.observations||'')}</textarea></div>
-      
+
+      <div class="dj-section"><div class="dj-section-title">📝 Lessons Learned</div><textarea class="dj-textarea" placeholder="${dayTrades.length?'What did you learn from today\'s trades? What would you do differently?':'Why did you choose not to trade today? What did you observe in the market?'}" oninput="saveDJText('${filterDate}','lessons',this.value)">${esc(dj.lessons||'')}</textarea></div>
+
+      <div class="dj-section"><div class="dj-section-title">👁️ Observations</div><textarea class="dj-textarea" placeholder="${dayTrades.length?'What patterns or behaviors did you notice today?':'What market patterns did you notice? Any setups you watched but passed on?'}" oninput="saveDJText('${filterDate}','observations',this.value)">${esc(dj.observations||'')}</textarea></div>
+
       <div class="dj-section"><div class="dj-section-title">🎯 Tomorrow's Game Plan</div><textarea class="dj-textarea" placeholder="What's your plan for tomorrow? Key levels? Max trades? Any goals?" oninput="saveDJText('${filterDate}','gameplan',this.value)">${esc(dj.gameplan||'')}</textarea></div>
-      
+
       <div style="text-align:center;padding:16px 0;font-family:var(--mono);font-size:11px;color:var(--text-muted)">✓ Auto-saved</div>
     </div>`;
   }
@@ -2067,11 +2067,10 @@ function checkJournalCompletion(date){
       if(dow===0||dow===6){check.setDate(check.getDate()-1);continue}
       const dayJ=getDJ(key);
       const complete=dayJ.satisfaction||(dayJ.emotions&&dayJ.emotions.length)||(dayJ.lessons&&dayJ.lessons.trim().length>10);
-      // Also need trades on that day
       const dayTrades=trades.filter(t=>dKey(t.date)===key);
-      if(complete&&dayTrades.length>0){jStreak++;check.setDate(check.getDate()-1)}
+      if(complete){jStreak++;check.setDate(check.getDate()-1)}
       else if(dayTrades.length>0&&!complete){break}
-      else{check.setDate(check.getDate()-1);if(i>0)break}
+      else{check.setDate(check.getDate()-1);continue}
     }
     
     showJournalComplete(date,jStreak);
@@ -2396,7 +2395,10 @@ function toggleRoadmapCheck(stepId,checkIdx){
   const progress=getRoadmapProgress();
   if(!progress[stepId])progress[stepId]={};
   progress[stepId][checkIdx]=!progress[stepId][checkIdx];
+  const completed=!!progress[stepId][checkIdx];
   saveRoadmapProgress(progress);
+  const stepIndex=ROADMAP_STEPS.findIndex(s=>s.id===stepId);
+  if(stepIndex!==-1)api('POST','/api/roadmap',{stepIndex,itemIndex:checkIdx,completed}).catch(err=>console.error('Roadmap save error:',err));
   ren();
 }
 
