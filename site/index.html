@@ -3224,7 +3224,8 @@ function parseTopStepX(rows){
   filled.sort((a,b)=>(a['FilledAt']||'').localeCompare(b['FilledAt']||''));
 
   const rts=[];
-  const opens=[];
+  // Separate FIFO queues per product per side: long entries (Bid Opening) vs short entries (Ask Opening)
+  const longOpens={},shortOpens={};
 
   filled.forEach(o=>{
     const product=getProductFromContract(o['ContractName']||'');
@@ -3238,28 +3239,35 @@ function parseTopStepX(rows){
     if(dateMatch)date=dateMatch[3]+'-'+dateMatch[1]+'-'+dateMatch[2];
 
     const isBuy=side==='bid';
+    const contract=o['ContractName']||product;
 
     if(disposition==='opening'){
-      opens.push({product,qty,price,isBuy,date,contract:o['ContractName']||product});
-    }else if(disposition==='closing'&&opens.length){
-      const openIdx=opens.findIndex(op=>op.product===product);
-      if(openIdx>=0){
-        const open=opens[openIdx];
-        opens.splice(openIdx,1);
-        const closeQty=Math.min(open.qty,qty);
-        const direction=open.isBuy?'Long':'Short';
+      // Bid Opening = long entry; Ask Opening = short entry
+      const bucket=isBuy?longOpens:shortOpens;
+      if(!bucket[product])bucket[product]=[];
+      bucket[product].push({qty,price,date,contract});
+    }else if(disposition==='closing'){
+      // Ask Closing = exit long (match longOpens); Bid Closing = cover short (match shortOpens)
+      const bucket=isBuy?shortOpens:longOpens;
+      const direction=isBuy?'Short':'Long';
+      let remaining=qty;
+      while(remaining>0&&bucket[product]&&bucket[product].length){
+        const open=bucket[product][0];
+        const matchQty=Math.min(open.qty,remaining);
         const tv=TICK_VALUES[product]||1;
         const ts=TICK_SIZES[product]||0.01;
-        let pnl=direction==='Long'?((price-open.price)/ts)*tv*closeQty:((open.price-price)/ts)*tv*closeQty;
-        const rtFee=(RT_FEES[product]||2.00)*closeQty;
-        const netPnl=pnl-rtFee;
+        const pnl=direction==='Long'?((price-open.price)/ts)*tv*matchQty:((open.price-price)/ts)*tv*matchQty;
+        const rtFee=(RT_FEES[product]||2.00)*matchQty;
         rts.push({
           date:date||open.date,product,contract:open.contract,direction,
           entryPrice:open.price.toFixed(2),exitPrice:price.toFixed(2),
-          quantity:closeQty,grossPnl:Math.round(pnl*100)/100,
-          fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,
+          quantity:matchQty,grossPnl:Math.round(pnl*100)/100,
+          fees:Math.round(rtFee*100)/100,pnl:Math.round((pnl-rtFee)*100)/100,
           strategies:[],emotionRating:7,rulesFollowed:[],notes:''
         });
+        open.qty-=matchQty;
+        remaining-=matchQty;
+        if(open.qty<=0)bucket[product].shift();
       }
     }
   });
