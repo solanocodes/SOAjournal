@@ -321,6 +321,30 @@ app.post('/api/roadmap', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.post('/api/roadmap/sync', authMiddleware, async (req, res) => {
+  try {
+    const items = req.body.items || [];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM roadmap_progress WHERE user_id = $1', [req.user.id]);
+      for (const item of items) {
+        await client.query(
+          'INSERT INTO roadmap_progress (user_id, step_index, item_index) VALUES ($1,$2,$3)',
+          [req.user.id, item.stepIndex, item.itemIndex]
+        );
+      }
+      await client.query('COMMIT');
+      res.json({ success: true });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // ═══════════════════════════════════
 // RISK PLAN ROUTES
 // ═══════════════════════════════════

@@ -2243,7 +2243,7 @@ const ROADMAP_STEPS=[
 
 let expandedStep=null;
 function getRoadmapProgress(){const p={};(_cachedRoadmap||[]).forEach(r=>{const step=ROADMAP_STEPS[r.step_index];if(step){if(!p[step.id])p[step.id]={};p[step.id][r.item_index]=true}});return p}
-function saveRoadmapProgress(p){const c=[];ROADMAP_STEPS.forEach((s,si)=>{if(p[s.id]){Object.keys(p[s.id]).forEach(ii=>{if(p[s.id][ii])c.push({step_index:si,item_index:parseInt(ii)})})}});_cachedRoadmap=c}
+function saveRoadmapProgress(p){const c=[];ROADMAP_STEPS.forEach((s,si)=>{if(p[s.id]){Object.keys(p[s.id]).forEach(ii=>{if(p[s.id][ii])c.push({step_index:si,item_index:parseInt(ii)})})}});_cachedRoadmap=c;clearTimeout(window._rmSaveTimer);window._rmSaveTimer=setTimeout(()=>{const items=c.map(r=>({stepIndex:r.step_index,itemIndex:r.item_index}));api('POST','/api/roadmap/sync',{items}).catch(err=>console.error('Roadmap sync error:',err))},500)}
 
 let rmIntroPlayed=false;
 function rRoadmap(el){
@@ -2395,10 +2395,7 @@ function toggleRoadmapCheck(stepId,checkIdx){
   const progress=getRoadmapProgress();
   if(!progress[stepId])progress[stepId]={};
   progress[stepId][checkIdx]=!progress[stepId][checkIdx];
-  const completed=!!progress[stepId][checkIdx];
   saveRoadmapProgress(progress);
-  const stepIndex=ROADMAP_STEPS.findIndex(s=>s.id===stepId);
-  if(stepIndex!==-1)api('POST','/api/roadmap',{stepIndex,itemIndex:checkIdx,completed}).catch(err=>console.error('Roadmap save error:',err));
   ren();
 }
 
