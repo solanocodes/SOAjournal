@@ -363,6 +363,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dj-textarea:focus{border-color:var(--accent);outline:none}
 .dj-textarea::placeholder{color:var(--text-muted)}
 .dj-ai{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;line-height:1.7;font-size:13px;color:var(--text-secondary)}
+.ai-loading-spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .dj-ai h4{color:var(--text-primary);font-size:14px;margin:14px 0 6px;font-weight:700}
 .dj-ai h4:first-child{margin-top:0}
 .dj-ai strong{color:var(--text-primary)}
@@ -1221,7 +1223,7 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
 
       <div class="dj-section"><div class="dj-section-title">⭐ ${dayTrades.length?'Trading':'Daily'} Satisfaction</div><div class="dj-stars">${starHTML}</div></div>
 
-      ${dayTrades.length?`<div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai">${aiAnalysis}</div></div>`:''}
+      ${dayTrades.length?`<div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai" id="ai-analysis-${filterDate}">${_aiCache[filterDate]||aiAnalysis}</div></div>`:''}
 
       <div class="dj-section"><div class="dj-section-title">😤 ${dayTrades.length?'Post-Trading ':''}Emotions</div><div class="dj-chips">${emoChips}</div></div>
 
@@ -1236,7 +1238,9 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
       <div style="text-align:center;padding:16px 0;font-family:var(--mono);font-size:11px;color:var(--text-muted)">✓ Auto-saved</div>
     </div>`;
   }
-  el.innerHTML=h}
+  el.innerHTML=h;
+  if(filterDate){const _dt=trades.filter(t=>dKey(t.date)===filterDate);if(_dt.length)setTimeout(()=>fetchLLMAnalysis(filterDate,_dt,getDJ(filterDate)),100)}
+}
 
 // ─── AI COACH ───
 function rCoach(el){if(!trades.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">🤖</div><h3 class="empty-title">Need more data</h3><p class="empty-text">Log some trades first</p></div>`;return}
@@ -2522,7 +2526,7 @@ function rJournal(el){
     
     ${dayTrades.length?`<div class="dj-section">
       <div class="dj-section-title">🤖 AI Daily Analysis</div>
-      <div class="dj-ai">${aiAnalysis}</div>
+      <div class="dj-ai" id="ai-analysis-${journalDate}">${_aiCache[journalDate]||aiAnalysis}</div>
     </div>`:''}
     
     <div class="dj-section">
@@ -2554,6 +2558,7 @@ function rJournal(el){
       <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">✓ Auto-saved</span>
     </div>
   </div>`;
+  if(dayTrades.length)setTimeout(()=>fetchLLMAnalysis(journalDate,dayTrades,dj),100);
 }
 
 function setDJField(date,field,val){const dj=getDJ(date);dj[field]=val;saveDJ(date,dj);checkJournalCompletion(date);ren()}
@@ -2637,8 +2642,29 @@ function generateDailyAI(dayTrades,dj){
   }else{
     h+=`Red day with poor compliance. This is where accounts get blown up. Before tomorrow, re-read your SOA rules, set your max loss, and commit to following the system. No trade is better than a bad trade.`;
   }
-  
+
   return h;
+}
+
+const _aiCache={};
+function fetchLLMAnalysis(date,dayTrades,dj){
+  const cacheKey=date;
+  if(_aiCache[cacheKey])return;
+  const el=document.getElementById('ai-analysis-'+date);
+  if(!el)return;
+  const recentHistory=[];
+  const dates=[...new Set(trades.map(t=>dKey(t.date)))].sort().reverse().filter(d=>d!==date).slice(0,7);
+  dates.forEach(d=>{
+    const dt=trades.filter(t=>dKey(t.date)===d);
+    if(!dt.length)return;
+    const w=dt.filter(t=>t.pnl>0).length;
+    const rules=dt.reduce((s,t)=>s+(t.rulesFollowed||[]).length,0);
+    recentHistory.push({date:d,tradeCount:dt.length,pnl:dt.reduce((s,t)=>s+(t.pnl||0),0),winRate:dt.length?(w/dt.length*100):0,avgEmotion:dt.reduce((s,t)=>s+(t.emotionRating||5),0)/dt.length,compliance:dt.length?(rules/(dt.length*RL.length)*100):0});
+  });
+  el.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px 0"><div class="ai-loading-spinner"></div><span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">Generating personalized analysis...</span></div>'+el.innerHTML;
+  api('POST','/api/ai/journal-analysis',{date,dayTrades:dayTrades.map(t=>({ticker:t.ticker,direction:t.direction,pnl:t.pnl,strategy:t.strategy,emotionRating:t.emotionRating,rulesFollowed:t.rulesFollowed,notes:t.notes})),journal:dj||{},recentHistory,riskPlan:_cachedRiskPlan||{}}).then(data=>{
+    if(data.analysis){_aiCache[cacheKey]=data.analysis;const el2=document.getElementById('ai-analysis-'+date);if(el2)el2.innerHTML=data.analysis}
+  }).catch(err=>{console.error('LLM analysis error:',err);const el2=document.getElementById('ai-analysis-'+date);if(el2){const spinner=el2.querySelector('.ai-loading-spinner');if(spinner)spinner.parentElement.remove()}});
 }
 
 // ═══ RISK PLAN ═══
