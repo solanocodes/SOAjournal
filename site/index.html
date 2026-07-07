@@ -931,7 +931,7 @@ const BD=[
 const TICK_VALUES={ES:12.50,MES:1.25,NQ:5.00,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:10.00,MCL:1.00,GC:10.00,MGC:1.00,SI:25.00,NG:10.00};
 const TICK_SIZES={ES:0.25,MES:0.25,NQ:0.25,MNQ:0.25,YM:1.00,MYM:1.00,RTY:0.10,M2K:0.10,CL:0.01,MCL:0.01,GC:0.10,MGC:0.10,SI:0.005,NG:0.001};
 // Round-trip all-in fees per contract (commission + exchange + clearing + NFA)
-const DEFAULT_RT_FEES={ES:5.00,NQ:5.00,MES:0.50,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:5.00,MCL:0.50,GC:5.00,MGC:0.50,SI:5.00,NG:5.00};
+const DEFAULT_RT_FEES={ES:5.00,NQ:5.00,MES:1.90,MNQ:1.90,YM:5.00,MYM:1.90,RTY:5.00,M2K:1.90,CL:5.00,MCL:1.90,GC:5.00,MGC:1.90,SI:5.00,NG:5.00};
 function getUserRT(){return(_cachedSettings&&_cachedSettings.customFees)||{}}
 function saveUserRT(f){if(!_cachedSettings)_cachedSettings={};_cachedSettings.customFees=f;api('POST','/api/settings',_cachedSettings).catch(err=>console.error(err))}
 function getRT(){const u=getUserRT();return{...DEFAULT_RT_FEES,...u}}
@@ -1051,9 +1051,9 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'roadmap',l:'Roadmap'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('')}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('')}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,roadmap:rRoadmap,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
 
 // ─── STATS ───
 function cStats(tr){const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<0);const wr=tr.length?w.length/tr.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length,sk,ar,avgEmo,em,st,cv}}
@@ -1100,43 +1100,7 @@ function rDash(el){
     return`<div class="strat-item"><div><div class="strat-name">${esc(name)}</div><div class="strat-meta">${d.t} trades · ${wr.toFixed(0)}% WR</div></div><div class="strat-pnl" style="color:${d.p>=0?'var(--green)':'var(--red)'}">${f$(d.p)}</div></div>`;
   }).join('');
   
-  // Build mini roadmap widget
-  const rmProgress=getRoadmapProgress();
-  let rmTotal=0,rmDone=0,rmCurrentStep=11,rmCurrentTitle='';
-  ROADMAP_STEPS.forEach(step=>{
-    const stepDone=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    step.checklist.forEach((_,i)=>{rmTotal++;if(rmProgress[step.id]&&rmProgress[step.id][i])rmDone++});
-    if(!stepDone&&rmCurrentStep===11){rmCurrentStep=step.id;rmCurrentTitle=step.title}
-  });
-  if(rmDone===rmTotal&&rmTotal>0){rmCurrentStep=11;rmCurrentTitle='Gradual Size Increase'}
-  const rmPct=rmTotal?(rmDone/rmTotal*100):0;
-  const rmDots=ROADMAP_STEPS.map(step=>{
-    const done=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    const cur=step.id===rmCurrentStep;
-    return`<div class="mini-rm-dot ${done?'done':cur?'current':'locked'}"></div>`;
-  }).join('');
-  const rmChecked=ROADMAP_STEPS.filter(s=>s.checklist.every((_,i)=>rmProgress[s.id]&&rmProgress[s.id][i])).length;
-  const rmPhase=rmCurrentStep<=3?'Foundation':rmCurrentStep<=5?'Strategy':rmCurrentStep<=8?'Execution':'Mastery';
-  
   el.innerHTML=`
-    <div class="mini-roadmap fade-up" onclick="sv('roadmap')">
-      <div class="mini-rm-top">
-        <span class="mini-rm-label">🗺️ SOA Journey — ${rmPhase} Phase</span>
-        <span class="mini-rm-pct">${rmPct.toFixed(0)}%</span>
-      </div>
-      <div class="mini-rm-step">
-        <div class="mini-rm-node">${rmCurrentStep}</div>
-        <div class="mini-rm-info">
-          <h4>Step ${rmCurrentStep}: ${rmCurrentTitle}</h4>
-          <p>${rmChecked} of 11 steps completed</p>
-        </div>
-      </div>
-      <div class="mini-rm-bar"><div class="mini-rm-bar-fill" style="width:${rmPct}%"></div></div>
-      <div class="mini-rm-cta">
-        <div class="mini-rm-steps">${rmDots}</div>
-        <span>Continue Journey →</span>
-      </div>
-    </div>
     <div class="dash-hero fade-up">
       <div class="dash-hero-label">Total Net P&L</div>
       <div class="dash-hero-pnl ${s.np>=0?'positive':'negative'}">${f$(s.np)}</div>
@@ -1615,16 +1579,6 @@ function generateMentorPDF(){
   const dateStr=now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   const streak=getStreakData();
   const rp=getRiskPlan();
-  const rmProgress=getRoadmapProgress();
-  
-  // Roadmap progress
-  let rmTotal=0,rmDone=0,rmCurrentStep=11,rmCurrentTitle='Gradual Size Increase';
-  ROADMAP_STEPS.forEach(step=>{
-    const stepDone=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    step.checklist.forEach((_,i)=>{rmTotal++;if(rmProgress[step.id]&&rmProgress[step.id][i])rmDone++});
-    if(!stepDone&&rmCurrentStep===11){rmCurrentStep=step.id;rmCurrentTitle=step.title}
-  });
-  const rmPct=rmTotal?(rmDone/rmTotal*100):0;
 
   // Strategy breakdown
   const byStrat={};
@@ -1678,8 +1632,7 @@ function generateMentorPDF(){
           <div style="font-size:11px;color:${MUT};font-family:monospace;margin-top:3px">Student: <strong style="color:${TXT}">${curUser}</strong> · ${dateStr}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:11px;color:${MUT};font-family:monospace">Roadmap: <strong style="color:${G}">${rmPct.toFixed(0)}%</strong> · Step ${rmCurrentStep}</div>
-          <div style="font-size:11px;color:${MUT};font-family:monospace;margin-top:2px">Streak: <strong style="color:${streak.current>=5?G:Y}">${streak.current}d</strong> · Best: ${streak.best}d</div>
+          <div style="font-size:11px;color:${MUT};font-family:monospace">Streak: <strong style="color:${streak.current>=5?G:Y}">${streak.current}d</strong> · Best: ${streak.best}d</div>
         </div>
       </div>
 
@@ -1885,9 +1838,6 @@ const MILESTONES=[
   
   // Journal Engagement
   {id:'first_journal',icon:'📓',title:'First Daily Journal!',desc:'You completed your first daily journal entry. Reflection is where growth happens.',check:t=>{return Object.values(_cachedJournals||{}).some(d=>d.lessons||d.observations||d.satisfaction)}},
-  {id:'roadmap_25',icon:'🗺️',title:'25% Roadmap Complete!',desc:'Quarter of the SOA journey done. You\'re building a foundation.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=25}},
-  {id:'roadmap_50',icon:'🛤️',title:'50% Roadmap Complete!',desc:'Halfway through the SOA system. The hardest part is behind you.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=50}},
-  {id:'roadmap_100',icon:'🎓',title:'SOA Graduate!',desc:'100% of the roadmap complete. You\'ve mastered the entire SOA system.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&done===total}},
 ];
 
 function chkMilestones(){
@@ -1941,14 +1891,12 @@ function showCelebration(milestone){
 const WT_STEPS=[
   {target:null,title:'Welcome to the SOA Trading Journal',desc:'This quick tour will show you how everything works. It takes about 60 seconds and will help you get the most out of your journal.',position:'center'},
   {target:'.nav-btn[data-view="dashboard"]',title:'Dashboard',desc:'Your home base. See your total P&L, win rate, discipline streak, equity curve, and strategy performance — all at a glance.',position:'bottom'},
-  {target:'.mini-roadmap',title:'SOA Journey Tracker',desc:'Tracks your progress through the 11-step SOA system. Click it to open the full roadmap with checklists for each step.',position:'bottom'},
   {target:'.nav-btn[data-view="calendar"]',title:'Calendar',desc:'See your P&L for every trading day. Green = profit, red = loss. <strong>Click any day with trades to open your Daily Journal</strong> — where you\'ll review trades, rate your emotions, get AI analysis, and write your lessons learned.',position:'bottom'},
   {target:'.nav-btn[data-view="trades"]',title:'Trade Log & Daily Journal',desc:'All your trades in one place. When you click a day from the calendar, your trades AND your daily journal appear here — emotions, lessons, and AI analysis.',position:'bottom'},
   {target:'.btn-import',title:'Import Trades',desc:'Import your trades from Tradovate, TopStepX, or Webull. Upload your CSV, review each trade, tag your strategy and emotions, then import.',position:'bottom'},
   {target:'.nav-btn[data-view="coach"]',title:'AI Trade Coach',desc:'Your personal trading analyst. Gets pattern analysis, emotional insights, rule compliance breakdown, and an SOA system check — all powered by your actual data.',position:'bottom'},
   {target:'.nav-btn[data-view="risk"]',title:'Risk Plan',desc:'Define your max loss per trade, per day, and per week. Set your account size and watch your risk status update in real-time as you trade.',position:'bottom'},
   {target:'.nav-btn[data-view="badges"]',title:'Badges & Milestones',desc:'Earn achievements as you trade — from your first $500 to $100K, discipline streaks, win rate milestones, and more. Milestones post to Discord automatically.',position:'bottom'},
-  {target:'.nav-btn[data-view="roadmap"]',title:'SOA Roadmap',desc:'The full 11-step SOA journey. Complete checklists for each step as you progress from setup to mastery. Your mentor can see your progress in your report.',position:'bottom'},
   {target:'.nav-btn[data-view="reports"]',title:'Reports',desc:'Generate daily recap cards and weekly report cards. Download, copy, or share them directly to Discord. Plus your A+ Setup Library lives here.',position:'bottom'},
   {target:'.btn-mentor-report',title:'Send to Mentor',desc:'One click generates a comprehensive report with all your stats, strategies, emotions, rule compliance, and screenshots. Downloads as an image you can send to your mentor on Discord.',position:'bottom'},
   {target:null,title:'You\'re all set!',desc:'Start by importing your first CSV or logging a trade manually. The more data you log, the smarter the AI Coach gets. Welcome to SOA.',position:'center'}
