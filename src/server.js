@@ -556,7 +556,7 @@ You have tools that query the trader's REAL data. Rules for you:
 - When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
 - If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
 
-DOCUMENTS: when the trader attaches a document, it is teach-the-coach material — usually their trading notes, entry model write-up, or summaries of past coaching conversations. Read it fully, extract every durable fact (entry model rules, risk/withdrawal plans, goals, known patterns and struggles, commitments), and save each one with remember() using the right kind. Then reply with a short bullet summary of what you learned and stored — do not quote the document back at length. If it conflicts with what you already know, ask about the conflict.
+DOCUMENTS: when the trader attaches a document, it is teach-the-coach material — usually their trading notes, entry model write-up, or summaries of past coaching conversations. Read it fully, extract every durable fact (entry model rules, risk/withdrawal plans, goals, known patterns and struggles, commitments), and save them with remember() using the right kind — batch ALL your remember() calls into a single response rather than one at a time. Then reply with a short bullet summary of what you learned and stored — do not quote the document back at length. If it conflicts with what you already know, ask about the conflict.
 
 DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
 
@@ -777,14 +777,14 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       [req.user.id, 'user', (message || 'Document upload') + (image ? ' [chart screenshot attached]' : '') + docNote, !!image]);
 
     let reply = '';
-    for (let i = 0; i < 6; i++) {
+    const sys = [
+      { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: dyn }
+    ];
+    for (let i = 0; i < 10; i++) {
       const resp = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6', max_tokens: 1200,
-        system: [
-          { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: dyn }
-        ],
-        tools: COACH_TOOLS, messages
+        model: 'claude-sonnet-4-6', max_tokens: 2000,
+        system: sys, tools: COACH_TOOLS, messages
       });
       const toolUses = resp.content.filter(b => b.type === 'tool_use');
       const texts = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
@@ -794,12 +794,23 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       for (const tu of toolUses) {
         let out;
         try { out = await coachTool(tu.name, tu.input || {}, req.user.id); }
-        catch (e) { out = { error: 'tool failed' }; }
+        catch (e) { console.error('Coach tool error:', tu.name, e.message); out = { error: 'tool failed: ' + e.message }; }
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 12000) });
       }
       messages.push({ role: 'user', content: results });
     }
-    if (!reply) reply = 'I hit a snag pulling your data — ask me that again.';
+    if (!reply) {
+      // Tool budget exhausted — force a text-only wrap-up so the user always gets an answer
+      try {
+        const fin = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6', max_tokens: 1500,
+          system: sys, tools: COACH_TOOLS, tool_choice: { type: 'none' },
+          messages: [...messages, { role: 'user', content: 'Wrap up now in plain text: summarize what you just did and learned (including anything you saved to memory), and what the trader should know or do next.' }]
+        });
+        reply = fin.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      } catch (e) { console.error('Coach wrap-up error:', e.message); }
+    }
+    if (!reply) reply = 'I processed part of that but ran out of room to reply — send that again or ask me what I saved.';
 
     await pool.query('INSERT INTO coach_messages (user_id, role, content) VALUES ($1,$2,$3)', [req.user.id, 'assistant', reply]);
     res.json({ reply, remaining: 29 - used });
