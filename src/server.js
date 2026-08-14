@@ -116,7 +116,7 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
       fees: parseFloat(r.fees), grossPnl: parseFloat(r.gross_pnl),
       strategy: r.strategy, emotionRating: r.emotion_rating,
       rulesFollowed: r.rules_followed || [], notes: r.notes,
-      screenshots: r.screenshots || [], importedFrom: r.imported_from
+      screenshots: r.screenshots || [], importedFrom: r.imported_from, accountId: r.account_id
     }));
     res.json(trades);
   } catch (err) {
@@ -129,20 +129,21 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
   try {
     const t = req.body;
     await pool.query(
-      `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        ON CONFLICT (id) DO UPDATE SET
          date=EXCLUDED.date, instrument=EXCLUDED.instrument, ticker=EXCLUDED.ticker,
          direction=EXCLUDED.direction, entry_price=EXCLUDED.entry_price, exit_price=EXCLUDED.exit_price,
          quantity=EXCLUDED.quantity, stop_loss=EXCLUDED.stop_loss, pnl=EXCLUDED.pnl,
          fees=EXCLUDED.fees, gross_pnl=EXCLUDED.gross_pnl, strategy=EXCLUDED.strategy,
          emotion_rating=EXCLUDED.emotion_rating, rules_followed=EXCLUDED.rules_followed,
-         notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from`,
+         notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from,
+         account_id=EXCLUDED.account_id`,
       [t.id, req.user.id, t.date, t.instrument||'futures', t.ticker, t.direction,
        t.entryPrice||'', t.exitPrice||'', t.quantity||'1', t.stopLoss||'',
        t.pnl||0, t.fees||0, t.grossPnl||t.pnl||0, t.strategy||'No Strategy Used',
        t.emotionRating||7, t.rulesFollowed||[], t.notes||'',
-       t.screenshots||[], t.importedFrom||'']
+       t.screenshots||[], t.importedFrom||'', t.accountId||null]
     );
     res.json({ success: true });
   } catch (err) {
@@ -169,14 +170,14 @@ app.post('/api/trades/bulk', authMiddleware, async (req, res) => {
               notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from`
           : `ON CONFLICT (id) DO NOTHING`;
         await client.query(
-          `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
            ${conflictClause}`,
           [t.id, req.user.id, t.date, t.instrument||'futures', t.ticker, t.direction,
            t.entryPrice||'', t.exitPrice||'', t.quantity||'1', t.stopLoss||'',
            t.pnl||0, t.fees||0, t.grossPnl||t.pnl||0, t.strategy||'No Strategy Used',
            t.emotionRating||7, t.rulesFollowed||[], t.notes||'',
-           t.screenshots||[], t.importedFrom||'']
+           t.screenshots||[], t.importedFrom||'', t.accountId||null]
         );
       }
       await client.query('COMMIT');
@@ -744,6 +745,199 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Coach chat error:', err);
     res.status(500).json({ error: 'Coach is unavailable right now' });
+  }
+});
+
+// ═══════════════════════════════════
+// PROP ACCOUNTS & TRADOVATE SYNC
+// ═══════════════════════════════════
+
+const crypto = require('crypto');
+const ENC_KEY = crypto.scryptSync(process.env.JWT_SECRET || 'soa-dev-secret', 'soa-acct-salt', 32);
+function encSecret(text) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv);
+  const enc = Buffer.concat([c.update(String(text), 'utf8'), c.final()]);
+  return iv.toString('hex') + ':' + c.getAuthTag().toString('hex') + ':' + enc.toString('hex');
+}
+function decSecret(blob) {
+  const [iv, tag, data] = String(blob).split(':');
+  const d = crypto.createDecipheriv('aes-256-gcm', ENC_KEY, Buffer.from(iv, 'hex'));
+  d.setAuthTag(Buffer.from(tag, 'hex'));
+  return Buffer.concat([d.update(Buffer.from(data, 'hex')), d.final()]).toString('utf8');
+}
+
+function acctRow(r) {
+  return { id: r.id, name: r.name, firm: r.firm, env: r.env, brokerIds: r.broker_ids,
+    tvUser: r.tv_user, hasCredentials: !!(r.tv_user && r.tv_pass_enc),
+    phase: r.phase, profitTarget: parseFloat(r.profit_target), maxDrawdown: parseFloat(r.max_drawdown),
+    minDays: r.min_days, consistencyPct: r.consistency_pct, payoutMin: parseFloat(r.payout_min),
+    lastSync: r.last_sync };
+}
+
+app.get('/api/accounts', authMiddleware, async (req, res) => {
+  try {
+    const rows = (await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY id', [req.user.id])).rows;
+    res.json(rows.map(acctRow));
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/accounts', authMiddleware, async (req, res) => {
+  try {
+    const a = req.body;
+    if (!a.name) return res.status(400).json({ error: 'Account name required' });
+    const passEnc = a.tvPass ? encSecret(a.tvPass) : '';
+    if (a.id) {
+      const cur = (await pool.query('SELECT tv_pass_enc FROM accounts WHERE id = $1 AND user_id = $2', [a.id, req.user.id])).rows[0];
+      if (!cur) return res.status(404).json({ error: 'Account not found' });
+      await pool.query(
+        `UPDATE accounts SET name=$1, firm=$2, env=$3, broker_ids=$4, tv_user=$5, tv_pass_enc=$6,
+         phase=$7, profit_target=$8, max_drawdown=$9, min_days=$10, consistency_pct=$11, payout_min=$12
+         WHERE id=$13 AND user_id=$14`,
+        [a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'',
+         a.tvPass ? passEnc : cur.tv_pass_enc,
+         a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
+         a.id, req.user.id]);
+      res.json({ success: true, id: a.id });
+    } else {
+      const r = await pool.query(
+        `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+        [req.user.id, a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'', passEnc,
+         a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0]);
+      res.json({ success: true, id: r.rows[0].id });
+    }
+  } catch (err) { console.error('Account save error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/accounts/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('UPDATE trades SET account_id = NULL WHERE account_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    await pool.query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ---- Tradovate sync ----
+const TV_TICK_VALUES = {ES:12.50,MES:1.25,NQ:5.00,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:10.00,MCL:1.00,GC:10.00,MGC:1.00,SI:25.00,NG:10.00};
+const TV_TICK_SIZES = {ES:0.25,MES:0.25,NQ:0.25,MNQ:0.25,YM:1.00,MYM:1.00,RTY:0.10,M2K:0.10,CL:0.01,MCL:0.01,GC:0.10,MGC:0.10,SI:0.005,NG:0.001};
+const TV_RT_FEES = {ES:5.00,NQ:5.00,MES:1.90,MNQ:1.90,YM:5.00,MYM:1.90,RTY:5.00,M2K:1.90,CL:5.00,MCL:1.90,GC:5.00,MGC:1.90,SI:5.00,NG:5.00};
+function tvProduct(contractName) {
+  const m = String(contractName).match(/^([A-Z]+?)[FGHJKMNQUVXZ]\d+$/i);
+  return m ? m[1].toUpperCase() : String(contractName).replace(/[0-9]+$/, '').toUpperCase();
+}
+
+async function tvFetch(base, path, token) {
+  const r = await fetch(base + path, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+  if (!r.ok) throw new Error(`Tradovate ${path} failed (${r.status})`);
+  return r.json();
+}
+
+async function tvAuth(base, username, password) {
+  if (!process.env.TRADOVATE_CID || !process.env.TRADOVATE_SEC) {
+    throw new Error('Tradovate API keys are not configured on the server (TRADOVATE_CID / TRADOVATE_SEC).');
+  }
+  const r = await fetch(base + '/auth/accesstokenrequest', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: username, password,
+      appId: 'SOA Journal', appVersion: '1.0',
+      cid: parseInt(process.env.TRADOVATE_CID), sec: process.env.TRADOVATE_SEC,
+      deviceId: 'soa-' + crypto.createHash('md5').update(username).digest('hex').slice(0, 16)
+    })
+  });
+  const data = await r.json().catch(() => ({}));
+  if (data['p-ticket']) throw new Error('Tradovate is asking for a captcha — log into Tradovate once in a browser, then retry the sync.');
+  if (!r.ok || !data.accessToken) throw new Error(data.errorText || 'Tradovate login failed — check the username and password.');
+  return data.accessToken;
+}
+
+app.post('/api/accounts/:id/sync', authMiddleware, async (req, res) => {
+  try {
+    const acct = (await pool.query('SELECT * FROM accounts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id])).rows[0];
+    if (!acct) return res.status(404).json({ error: 'Account not found' });
+    if (!acct.tv_user || !acct.tv_pass_enc) return res.status(400).json({ error: 'Add Tradovate credentials to this account first.' });
+
+    const base = acct.env === 'live' ? 'https://live.tradovateapi.com/v1' : 'https://demo.tradovateapi.com/v1';
+    const token = await tvAuth(base, acct.tv_user, decSecret(acct.tv_pass_enc));
+
+    const tvAccounts = await tvFetch(base, '/account/list', token);
+    const wanted = (acct.broker_ids || '').split(',').map(x => x.trim()).filter(Boolean);
+    const matched = tvAccounts.filter(a => !wanted.length || wanted.some(w => (a.name || '').includes(w)));
+    if (!matched.length) return res.status(400).json({ error: 'No Tradovate accounts matched. Check the linked account IDs (' + tvAccounts.map(a => a.name).join(', ') + ')' });
+    const acctIds = new Set(matched.map(a => a.id));
+
+    const [orders, fills] = await Promise.all([
+      tvFetch(base, '/order/list', token),
+      tvFetch(base, '/fill/list', token)
+    ]);
+    const orderById = {};
+    orders.forEach(o => { orderById[o.id] = o; });
+    const relevant = fills.filter(f => { const o = orderById[f.orderId]; return o && acctIds.has(o.accountId); });
+
+    const contractIds = [...new Set(relevant.map(f => f.contractId).filter(Boolean))];
+    const contractName = {};
+    for (let i = 0; i < contractIds.length; i += 20) {
+      const chunk = contractIds.slice(i, i + 20);
+      const items = await tvFetch(base, '/contract/items?ids=' + chunk.join(','), token);
+      (Array.isArray(items) ? items : []).forEach(c => { contractName[c.id] = c.name; });
+    }
+
+    relevant.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const byProduct = {};
+    relevant.forEach(f => {
+      const product = tvProduct(contractName[f.contractId] || '');
+      if (!byProduct[product]) byProduct[product] = [];
+      byProduct[product].push(f);
+    });
+
+    const rts = [];
+    Object.entries(byProduct).forEach(([product, pf]) => {
+      let pos = 0, entries = [];
+      pf.forEach(f => {
+        const qty = f.qty || 1, price = f.price || 0;
+        const isBuy = (f.action || '').toLowerCase() === 'buy';
+        const signed = isBuy ? qty : -qty;
+        const date = String(f.timestamp).slice(0, 10);
+        if (pos === 0) { entries = [{ qty, price }]; pos = signed; }
+        else if ((pos > 0 && !isBuy) || (pos < 0 && isBuy)) {
+          const closeQty = Math.min(Math.abs(pos), qty);
+          const ep = entries.reduce((s, e) => s + e.price * e.qty, 0) / entries.reduce((s, e) => s + e.qty, 0);
+          const dir = pos > 0 ? 'Long' : 'Short';
+          const tv = TV_TICK_VALUES[product] || 1, ts = TV_TICK_SIZES[product] || 0.01;
+          const gross = (dir === 'Long' ? (price - ep) : (ep - price)) / ts * tv * closeQty;
+          const fee = (TV_RT_FEES[product] || 2.0) * closeQty;
+          rts.push({ date, product, direction: dir, entryPrice: ep.toFixed(2), exitPrice: price.toFixed(2),
+            quantity: closeQty, grossPnl: Math.round(gross * 100) / 100, fees: Math.round(fee * 100) / 100,
+            pnl: Math.round((gross - fee) * 100) / 100 });
+          const rem = Math.abs(pos) - closeQty;
+          if (rem <= 0) { pos = 0; entries = []; const left = qty - closeQty; if (left > 0) { entries = [{ qty: left, price }]; pos = isBuy ? left : -left; } }
+          else pos = pos > 0 ? rem : -rem;
+        } else { entries.push({ qty, price }); pos += signed; }
+      });
+    });
+
+    const existing = new Set((await pool.query(
+      'SELECT date, ticker, direction, entry_price, exit_price, quantity, pnl FROM trades WHERE user_id = $1', [req.user.id]
+    )).rows.map(t => [String(t.date).slice(0,10), t.ticker, t.direction, t.entry_price, t.exit_price, t.quantity, Math.round(parseFloat(t.pnl))].join('|')));
+
+    let imported = 0;
+    for (const t of rts) {
+      const sig = [t.date, t.product, t.direction, t.entryPrice, t.exitPrice, String(t.quantity), Math.round(t.pnl)].join('|');
+      if (existing.has(sig)) continue;
+      existing.add(sig);
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      await pool.query(
+        `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id)
+         VALUES ($1,$2,$3,'futures',$4,$5,$6,$7,$8,'',$9,$10,$11,'No Strategy Used',7,'{}','Synced from Tradovate','{}','tradovate',$12)`,
+        [id, req.user.id, t.date, t.product, t.direction, t.entryPrice, t.exitPrice, String(t.quantity), t.pnl, t.fees, t.grossPnl, acct.id]);
+      imported++;
+    }
+    await pool.query('UPDATE accounts SET last_sync = NOW() WHERE id = $1', [acct.id]);
+    res.json({ success: true, imported, matched: rts.length, accounts: matched.map(a => a.name) });
+  } catch (err) {
+    console.error('Tradovate sync error:', err.message);
+    res.status(502).json({ error: err.message || 'Sync failed' });
   }
 });
 
