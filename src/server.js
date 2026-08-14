@@ -425,6 +425,58 @@ app.get('/api/mentor/student/:id', authMiddleware, mentorOnly, async (req, res) 
   }
 });
 
+app.get('/api/mentor/insights', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const students = (await pool.query('SELECT id, username, first_name, last_name FROM users WHERE is_mentor = FALSE')).rows;
+    if (!students.length) return res.json([]);
+    const ids = students.map(s => s.id);
+    const since = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+    const week = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const [trades, plans, journals, mems, chats] = await Promise.all([
+      pool.query('SELECT user_id, date, pnl FROM trades WHERE user_id = ANY($1) AND date >= $2', [ids, since]),
+      pool.query('SELECT user_id, max_trades_per_day, max_loss_per_day FROM risk_plans WHERE user_id = ANY($1)', [ids]),
+      pool.query("SELECT user_id, MAX(date) AS last FROM daily_journals WHERE user_id = ANY($1) AND (satisfaction > 0 OR lessons <> '') GROUP BY user_id", [ids]),
+      pool.query("SELECT user_id, kind, content FROM coach_memory WHERE user_id = ANY($1) AND status = 'active' AND kind IN ('commitment','flag') ORDER BY id DESC", [ids]),
+      pool.query('SELECT user_id, MAX(created_at) AS last FROM coach_messages WHERE user_id = ANY($1) GROUP BY user_id', [ids])
+    ]);
+    const planBy = {}; plans.rows.forEach(r => { planBy[r.user_id] = r; });
+    const jBy = {}; journals.rows.forEach(r => { jBy[r.user_id] = String(r.last).slice(0, 10); });
+    const cBy = {}; chats.rows.forEach(r => { cBy[r.user_id] = r.last; });
+    const memBy = {}; mems.rows.forEach(r => { (memBy[r.user_id] = memBy[r.user_id] || []).push(r); });
+    const byDay = {};
+    trades.rows.forEach(t => {
+      const d = String(t.date).slice(0, 10);
+      if (d < week) return;
+      const k = t.user_id + '|' + d;
+      if (!byDay[k]) byDay[k] = { uid: t.user_id, n: 0, pnl: 0 };
+      byDay[k].n++; byDay[k].pnl += parseFloat(t.pnl);
+    });
+    const out = students.map(st => {
+      const plan = planBy[st.id] || {};
+      let overTrade = 0, lossBreach = 0, tradedDays = 0;
+      Object.values(byDay).forEach(d => {
+        if (d.uid !== st.id) return;
+        tradedDays++;
+        if (plan.max_trades_per_day > 0 && d.n > plan.max_trades_per_day) overTrade++;
+        if (plan.max_loss_per_day > 0 && d.pnl < -parseFloat(plan.max_loss_per_day)) lossBreach++;
+      });
+      const lastJ = jBy[st.id] || null;
+      const gap = lastJ ? Math.floor((Date.now() - new Date(lastJ + 'T12:00:00').getTime()) / 864e5) : null;
+      const mem = memBy[st.id] || [];
+      return {
+        id: st.id, username: st.username,
+        name: (st.first_name && st.last_name) ? st.first_name + ' ' + st.last_name : st.username,
+        tradedDays7: tradedDays, overTradeDays7: overTrade, lossBreachDays7: lossBreach,
+        lastJournal: lastJ, journalGapDays: gap,
+        commitments: mem.filter(m => m.kind === 'commitment').slice(0, 3).map(m => m.content),
+        flags: mem.filter(m => m.kind === 'flag').slice(0, 3).map(m => m.content),
+        lastCoachChat: cBy[st.id] || null
+      };
+    });
+    res.json(out);
+  } catch (err) { console.error('Mentor insights error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.post('/api/mentor/note', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const { studentId, date, note } = req.body;
@@ -776,19 +828,25 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     await pool.query('INSERT INTO coach_messages (user_id, role, content, has_image) VALUES ($1,$2,$3,$4)',
       [req.user.id, 'user', (message || 'Document upload') + (image ? ' [chart screenshot attached]' : '') + docNote, !!image]);
 
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
     let reply = '';
+    const emit = (d) => { reply += d; res.write(d); };
     const sys = [
       { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: dyn }
     ];
+    let finished = false;
     for (let i = 0; i < 10; i++) {
-      const resp = await anthropic.messages.create({
+      const stream = anthropic.messages.stream({
         model: 'claude-sonnet-4-6', max_tokens: 2000,
         system: sys, tools: COACH_TOOLS, messages
       });
+      stream.on('text', emit);
+      const resp = await stream.finalMessage();
       const toolUses = resp.content.filter(b => b.type === 'tool_use');
-      const texts = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
-      if (resp.stop_reason !== 'tool_use' || !toolUses.length) { reply = texts; break; }
+      if (resp.stop_reason !== 'tool_use' || !toolUses.length) { finished = true; break; }
       messages.push({ role: 'assistant', content: resp.content });
       const results = [];
       for (const tu of toolUses) {
@@ -799,25 +857,41 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       }
       messages.push({ role: 'user', content: results });
     }
-    if (!reply) {
-      // Tool budget exhausted — force a text-only wrap-up so the user always gets an answer
+    if (!finished) {
       try {
-        const fin = await anthropic.messages.create({
+        const fin = anthropic.messages.stream({
           model: 'claude-sonnet-4-6', max_tokens: 1500,
           system: sys, tools: COACH_TOOLS, tool_choice: { type: 'none' },
           messages: [...messages, { role: 'user', content: 'Wrap up now in plain text: summarize what you just did and learned (including anything you saved to memory), and what the trader should know or do next.' }]
         });
-        reply = fin.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        fin.on('text', emit);
+        await fin.finalMessage();
       } catch (e) { console.error('Coach wrap-up error:', e.message); }
     }
-    if (!reply) reply = 'I processed part of that but ran out of room to reply — send that again or ask me what I saved.';
-
+    if (!reply) { reply = 'I processed that but could not compose a reply — ask me what I saved.'; res.write(reply); }
     await pool.query('INSERT INTO coach_messages (user_id, role, content) VALUES ($1,$2,$3)', [req.user.id, 'assistant', reply]);
-    res.json({ reply, remaining: 29 - used });
+    res.end();
   } catch (err) {
     console.error('Coach chat error:', err);
-    res.status(500).json({ error: 'Coach is unavailable right now' });
+    if (res.headersSent) { try { res.write('\n\n**The coach hit an error — try that again.**'); res.end(); } catch (e) {} }
+    else res.status(500).json({ error: 'Coach is unavailable right now' });
   }
+});
+
+app.get('/api/coach/memory', authMiddleware, async (req, res) => {
+  try {
+    const rows = (await pool.query(
+      "SELECT id, kind, content, created_at FROM coach_memory WHERE user_id = $1 AND status = 'active' ORDER BY kind, id DESC LIMIT 100", [req.user.id]
+    )).rows;
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/coach/memory/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query("UPDATE coach_memory SET status = 'deleted' WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
