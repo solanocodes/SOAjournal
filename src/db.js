@@ -142,6 +142,12 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- App state (cron guards etc.)
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+
       -- Mentor notes table
       CREATE TABLE IF NOT EXISTS mentor_notes (
         id SERIAL PRIMARY KEY,

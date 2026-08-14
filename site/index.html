@@ -1477,12 +1477,14 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
   }
   el.innerHTML=h}
 let _mentorInsights=null;
+function postRollCallNow(){if(!confirm('Post the journal roll call to Discord right now?'))return;api('POST','/api/mentor/rollcall').then(d=>alert('Posted — '+d.journaled+' of '+d.of+' journaled today')).catch(e=>alert(e.message))}
 function loadMentorInsights(){
   const el=document.getElementById('mentorInsights');if(!el)return;
+  const btn='<div style="margin-bottom:10px"><button class="btn-sm" onclick="postRollCallNow()">Post roll call to Discord now</button></div>';
   const render=list=>{
     const issues=list.filter(x=>x.overTradeDays7||x.lossBreachDays7||(x.journalGapDays!=null&&x.journalGapDays>=3)||x.journalGapDays==null);
-    if(!issues.length){el.innerHTML='<div class="mi-clear">Delta reports no flags this week — everyone journaling and inside their limits.</div>';return}
-    el.innerHTML='<div class="mi-title">Delta\'s flags · last 7 days</div>'+issues.map(x=>{
+    if(!issues.length){el.innerHTML=btn+'<div class="mi-clear">Delta reports no flags this week — everyone journaling and inside their limits.</div>';return}
+    el.innerHTML=btn+'<div class="mi-title">Delta\'s flags · last 7 days</div>'+issues.map(x=>{
       const bits=[];
       if(x.journalGapDays==null)bits.push('never journaled');
       else if(x.journalGapDays>=3)bits.push('no journal in '+x.journalGapDays+' days');
