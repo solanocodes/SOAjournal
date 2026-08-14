@@ -1113,8 +1113,8 @@ async function postRollCall() {
   if (!hook) return { error: 'DISCORD_ROLLCALL_WEBHOOK is not set in the environment' };
   const p = etParts();
   const dateKey = `${p.year}-${p.month}-${p.day}`;
-  const users = (await pool.query('SELECT id, username, first_name FROM users WHERE is_mentor = FALSE')).rows;
-  if (!users.length) return { error: 'No students yet' };
+  const users = (await pool.query('SELECT id, username, first_name FROM users ORDER BY is_mentor DESC, id')).rows;
+  if (!users.length) return { error: 'No users yet' };
   const done = (await pool.query(
     "SELECT DISTINCT user_id FROM daily_journals WHERE date = $1 AND (satisfaction > 0 OR lessons <> '')", [dateKey]
   )).rows.map(r => r.user_id);
