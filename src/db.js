@@ -163,6 +163,12 @@ const initDB = async () => {
       -- Account link on trades (added later, safe to re-run)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS account_id INTEGER;
 
+      -- Normalize legacy M/D/YY and MM/DD/YYYY trade dates to ISO (idempotent)
+      UPDATE trades SET date = to_char(
+        to_date(date, CASE WHEN date ~ '/[0-9]{4}$' THEN 'FMMM/FMDD/YYYY' ELSE 'FMMM/FMDD/YY' END),
+        'YYYY-MM-DD')
+      WHERE date ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}$';
+
       -- Pre-market columns (added later, safe to re-run)
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_bias VARCHAR(20) DEFAULT '';
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_mental_state INTEGER DEFAULT 0;

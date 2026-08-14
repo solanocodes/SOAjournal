@@ -445,7 +445,7 @@ app.get('/api/mentor/insights', authMiddleware, mentorOnly, async (req, res) => 
     const memBy = {}; mems.rows.forEach(r => { (memBy[r.user_id] = memBy[r.user_id] || []).push(r); });
     const byDay = {};
     trades.rows.forEach(t => {
-      const d = String(t.date).slice(0, 10);
+      const d = normDateStr(t.date);
       if (d < week) return;
       const k = t.user_id + '|' + d;
       if (!byDay[k]) byDay[k] = { uid: t.user_id, n: 0, pnl: 0 };
@@ -655,6 +655,15 @@ const COACH_TOOLS = [
 ];
 
 const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function normDateStr(d) {
+  d = String(d || '');
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+  let m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) return '20' + m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+  return d.slice(0, 10);
+}
 function tradeDow(d) { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return ''; return DOW[new Date(+m[1], +m[2]-1, +m[3]).getDay()]; }
 function isUntagged(t) { return !t.strategy || t.strategy === 'No Strategy Used'; }
 function aggr(rows) {
@@ -667,7 +676,7 @@ function aggr(rows) {
 async function coachTool(name, input, userId) {
   const tr = (await pool.query(
     'SELECT date, ticker, direction, pnl, strategy, emotion_rating, rules_followed, notes FROM trades WHERE user_id = $1 ORDER BY date ASC', [userId]
-  )).rows.map(r => ({ date: String(r.date).slice(0,10), ticker: r.ticker, direction: r.direction,
+  )).rows.map(r => ({ date: normDateStr(r.date), ticker: r.ticker, direction: r.direction,
     pnl: parseFloat(r.pnl), strategy: r.strategy, emotion: r.emotion_rating,
     rules_followed: (r.rules_followed||[]).length, notes: (r.notes||'').slice(0,80) }));
 
