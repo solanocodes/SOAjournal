@@ -194,6 +194,27 @@ app.post('/api/trades/bulk', authMiddleware, async (req, res) => {
   }
 });
 
+app.delete('/api/trades', authMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query('DELETE FROM trades WHERE user_id = $1', [req.user.id]);
+    res.json({ success: true, deleted: r.rowCount });
+  } catch (err) { console.error('API error [DELETE /api/trades]:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/badges', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM badges WHERE user_id = $1', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) { console.error('API error [DELETE /api/badges]:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/milestones', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM milestones WHERE user_id = $1', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) { console.error('API error [DELETE /api/milestones]:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.delete('/api/trades/:id', authMiddleware, async (req, res) => {
   try {
     await pool.query('DELETE FROM trades WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
