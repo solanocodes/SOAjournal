@@ -1135,7 +1135,6 @@ async function postRollCall() {
   const r = await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'SOA Journal', embeds: [embed] }) });
   if (!r.ok) return { error: 'Discord returned ' + r.status };
-  await pool.query("INSERT INTO app_state (key, value) VALUES ('rollcall_last', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [dateKey]);
   return { success: true, journaled: journaled.length, of: users.length };
 }
 
@@ -1144,12 +1143,15 @@ function startRollCall() {
     try {
       const p = etParts();
       if (p.weekday === 'Sat' || p.weekday === 'Sun') return;
-      if (p.hour !== '17' || p.minute !== '30') return;
+      const mins = parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10);
+      if (mins < 17 * 60 + 30) return; // fire on any tick from 5:30pm ET onward
       const dateKey = `${p.year}-${p.month}-${p.day}`;
       const last = (await pool.query("SELECT value FROM app_state WHERE key = 'rollcall_last'")).rows[0];
       if (last && last.value === dateKey) return;
       const out = await postRollCall();
-      if (out.error) console.error('Roll call:', out.error); else console.log('Roll call posted:', out.journaled + '/' + out.of);
+      if (out.error) { console.error('Roll call:', out.error); return; }
+      await pool.query("INSERT INTO app_state (key, value) VALUES ('rollcall_last', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [dateKey]);
+      console.log('Roll call posted:', out.journaled + '/' + out.of);
     } catch (e) { console.error('Roll call error:', e.message); }
   }, 60000);
 }
