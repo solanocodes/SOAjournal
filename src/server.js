@@ -529,6 +529,225 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
 });
 
 // ═══════════════════════════════════
+// AI COACH CHAT
+// ═══════════════════════════════════
+
+const COACH_SYSTEM = `You are the SOA Coach — the in-app trading coach inside the SOA Trading Journal, mentoring futures traders who follow the SOA system.
+
+SOA system context: strategies are SOA Levels, Fibonacci Golden Pocket, TFC, and Orderblocks. The 8 rules: followed max loss per trade; followed max loss per day; waited for confirmation candle; traded at key level / liquidity zone; proper position sizing; did not resize mid-trade; stopped at trade limit; followed stop loss plan.
+
+You have tools that query the trader's REAL data. Rules for you:
+- ALWAYS use tools before making any claim about their performance. Never invent or estimate statistics — cite exact figures from tool results.
+- Use run_counterfactual to turn advice into dollars ("stopping at 3 trades/day would have made you $X more").
+- Use remember(kind, content) to save durable facts the trader tells you or commits to. kinds: profile (who they are, account situation), playbook (their entry model / trading rules), commitment (things they commit to doing), flag (patterns you have flagged), question (open questions like withdrawal timing). Save conclusions, not chit-chat. Keep each memory under 200 characters.
+- When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
+- If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
+
+INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
+
+Style: direct, specific, mentor voice. Short paragraphs. Plain text with **bold** for emphasis. No emoji, no headers. Under 250 words unless performing a requested audit.`;
+
+const COACH_TOOLS = [
+  { name: 'query_trades', description: 'Query the trader\'s real trade history with filters. Returns aggregates and up to 50 matching trades.',
+    input_schema: { type: 'object', properties: {
+      day_of_week: { type: 'string', description: 'Filter by weekday name, e.g. Friday' },
+      date_from: { type: 'string', description: 'YYYY-MM-DD inclusive' },
+      date_to: { type: 'string', description: 'YYYY-MM-DD inclusive' },
+      strategy_contains: { type: 'string', description: 'Substring match on strategy; use "none" for untagged trades' },
+      min_emotion: { type: 'number' }, max_emotion: { type: 'number' },
+      result: { type: 'string', enum: ['win', 'loss'] },
+      limit: { type: 'number', description: 'Max trades to return, default 20' }
+    } } },
+  { name: 'get_risk_plan', description: 'Get the trader\'s risk plan: account size/type, loss limits, max trades per day, personal rules.',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'get_journal_entries', description: 'Get daily journal entries (satisfaction 1-5, emotions, biases, lessons, observations, game plan).',
+    input_schema: { type: 'object', properties: {
+      date_from: { type: 'string' }, date_to: { type: 'string' }, limit: { type: 'number', description: 'default 10' } } } },
+  { name: 'run_counterfactual', description: 'Compute what the trader\'s total P&L would have been under a hypothetical rule, vs actual.',
+    input_schema: { type: 'object', properties: {
+      rule: { type: 'string', enum: ['max_trades_per_day', 'min_emotion', 'skip_untagged', 'skip_day'], description: 'max_trades_per_day: only first N trades each day. min_emotion: only trades with emotion >= N. skip_untagged: drop trades with no strategy. skip_day: drop trades on a weekday (value = day name).' },
+      value: { type: 'string', description: 'N for numeric rules, weekday name for skip_day' }
+    }, required: ['rule'] } },
+  { name: 'remember', description: 'Save a durable fact about this trader to your long-term memory.',
+    input_schema: { type: 'object', properties: {
+      kind: { type: 'string', enum: ['profile', 'playbook', 'commitment', 'flag', 'question'] },
+      content: { type: 'string' }
+    }, required: ['kind', 'content'] } }
+];
+
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function tradeDow(d) { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return ''; return DOW[new Date(+m[1], +m[2]-1, +m[3]).getDay()]; }
+function isUntagged(t) { return !t.strategy || t.strategy === 'No Strategy Used'; }
+function aggr(rows) {
+  const w = rows.filter(t => t.pnl > 0).length;
+  return { count: rows.length, total_pnl: +rows.reduce((a,t) => a + t.pnl, 0).toFixed(2),
+    win_rate: rows.length ? +(w / rows.length * 100).toFixed(1) : 0,
+    avg_emotion: rows.length ? +(rows.reduce((a,t) => a + (t.emotion||5), 0) / rows.length).toFixed(1) : 0 };
+}
+
+async function coachTool(name, input, userId) {
+  const tr = (await pool.query(
+    'SELECT date, ticker, direction, pnl, strategy, emotion_rating, rules_followed, notes FROM trades WHERE user_id = $1 ORDER BY date ASC', [userId]
+  )).rows.map(r => ({ date: String(r.date).slice(0,10), ticker: r.ticker, direction: r.direction,
+    pnl: parseFloat(r.pnl), strategy: r.strategy, emotion: r.emotion_rating,
+    rules_followed: (r.rules_followed||[]).length, notes: (r.notes||'').slice(0,80) }));
+
+  if (name === 'query_trades') {
+    let rows = tr;
+    if (input.day_of_week) rows = rows.filter(t => tradeDow(t.date).toLowerCase() === String(input.day_of_week).toLowerCase());
+    if (input.date_from) rows = rows.filter(t => t.date >= input.date_from);
+    if (input.date_to) rows = rows.filter(t => t.date <= input.date_to);
+    if (input.strategy_contains) {
+      const q = String(input.strategy_contains).toLowerCase();
+      rows = q === 'none' ? rows.filter(isUntagged) : rows.filter(t => (t.strategy||'').toLowerCase().includes(q));
+    }
+    if (input.min_emotion != null) rows = rows.filter(t => (t.emotion||5) >= input.min_emotion);
+    if (input.max_emotion != null) rows = rows.filter(t => (t.emotion||5) <= input.max_emotion);
+    if (input.result === 'win') rows = rows.filter(t => t.pnl > 0);
+    if (input.result === 'loss') rows = rows.filter(t => t.pnl < 0);
+    const lim = Math.min(input.limit || 20, 50);
+    return { ...aggr(rows), trades: rows.slice(-lim) };
+  }
+  if (name === 'get_risk_plan') {
+    const r = (await pool.query('SELECT * FROM risk_plans WHERE user_id = $1', [userId])).rows[0];
+    if (!r) return { note: 'No risk plan set yet.' };
+    return { account_size: parseFloat(r.account_size), account_type: r.account_type,
+      max_loss_per_trade: parseFloat(r.max_loss_per_trade), max_loss_per_day: parseFloat(r.max_loss_per_day),
+      max_loss_per_week: parseFloat(r.max_loss_per_week), max_drawdown: parseFloat(r.max_drawdown),
+      max_trades_per_day: r.max_trades_per_day, personal_rules: r.personal_rules };
+  }
+  if (name === 'get_journal_entries') {
+    let q = 'SELECT date, satisfaction, emotions, biases, lessons, observations, gameplan FROM daily_journals WHERE user_id = $1';
+    const ps = [userId];
+    if (input.date_from) { ps.push(input.date_from); q += ` AND date >= $${ps.length}`; }
+    if (input.date_to) { ps.push(input.date_to); q += ` AND date <= $${ps.length}`; }
+    q += ' ORDER BY date DESC LIMIT ' + Math.min(input.limit || 10, 30);
+    return { entries: (await pool.query(q, ps)).rows };
+  }
+  if (name === 'run_counterfactual') {
+    const actual = aggr(tr).total_pnl;
+    let kept = tr;
+    if (input.rule === 'max_trades_per_day') {
+      const n = parseInt(input.value) || 3; const per = {};
+      kept = tr.filter(t => { per[t.date] = (per[t.date]||0) + 1; return per[t.date] <= n; });
+    } else if (input.rule === 'min_emotion') {
+      const n = parseInt(input.value) || 6; kept = tr.filter(t => (t.emotion||5) >= n);
+    } else if (input.rule === 'skip_untagged') {
+      kept = tr.filter(t => !isUntagged(t));
+    } else if (input.rule === 'skip_day') {
+      const d = String(input.value||'Friday').toLowerCase(); kept = tr.filter(t => tradeDow(t.date).toLowerCase() !== d);
+    }
+    const hypo = aggr(kept);
+    return { actual_pnl: actual, hypothetical_pnl: hypo.total_pnl, difference: +(hypo.total_pnl - actual).toFixed(2),
+      trades_kept: hypo.count, trades_dropped: tr.length - hypo.count, hypothetical_win_rate: hypo.win_rate };
+  }
+  if (name === 'remember') {
+    const kinds = ['profile','playbook','commitment','flag','question'];
+    if (!kinds.includes(input.kind)) return { error: 'invalid kind' };
+    await pool.query('INSERT INTO coach_memory (user_id, kind, content) VALUES ($1,$2,$3)',
+      [userId, input.kind, String(input.content).slice(0, 400)]);
+    return { saved: true };
+  }
+  return { error: 'unknown tool' };
+}
+
+app.get('/api/coach/history', authMiddleware, async (req, res) => {
+  try {
+    const msgs = (await pool.query(
+      'SELECT role, content, has_image FROM coach_messages WHERE user_id = $1 ORDER BY id DESC LIMIT 40', [req.user.id]
+    )).rows.reverse();
+    const mem = (await pool.query(
+      "SELECT COUNT(*)::int AS c FROM coach_memory WHERE user_id = $1 AND status = 'active'", [req.user.id]
+    )).rows[0].c;
+    res.json({ messages: msgs, memoryCount: mem });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/coach/chat', authMiddleware, async (req, res) => {
+  if (!anthropic) return res.status(503).json({ error: 'Coach is not configured yet' });
+  try {
+    const { message, image } = req.body;
+    if (!message && !image) return res.status(400).json({ error: 'Empty message' });
+
+    const used = (await pool.query(
+      "SELECT COUNT(*)::int AS c FROM coach_messages WHERE user_id = $1 AND role = 'user' AND created_at > NOW() - INTERVAL '24 hours'", [req.user.id]
+    )).rows[0].c;
+    if (used >= 30) return res.status(429).json({ error: 'Daily coach limit reached — back tomorrow.' });
+
+    const memRows = (await pool.query(
+      "SELECT kind, content, created_at FROM coach_memory WHERE user_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 60", [req.user.id]
+    )).rows;
+    const hist = (await pool.query(
+      'SELECT role, content FROM coach_messages WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [req.user.id]
+    )).rows.reverse();
+
+    const stats = (await pool.query(
+      `SELECT COUNT(*)::int AS n, COALESCE(SUM(pnl),0) AS pnl,
+        COUNT(*) FILTER (WHERE pnl > 0)::int AS wins,
+        COUNT(*) FILTER (WHERE strategy IS NULL OR strategy = 'No Strategy Used')::int AS untagged
+       FROM trades WHERE user_id = $1`, [req.user.id]
+    )).rows[0];
+
+    let dyn = `Trader snapshot: ${stats.n} trades, net P&L $${parseFloat(stats.pnl).toFixed(2)}, ` +
+      `${stats.n ? (stats.wins / stats.n * 100).toFixed(1) : 0}% win rate, ${stats.untagged} untagged trades. Today: ${new Date().toISOString().slice(0,10)}.\n`;
+    dyn += memRows.length
+      ? 'Your memory of this trader:\n' + memRows.map(m => `- [${m.kind}] ${m.content} (${String(m.created_at).slice(0,10)})`).join('\n')
+      : 'Your memory of this trader is EMPTY — run the intake interview.';
+
+    const messages = [];
+    for (const h of hist) {
+      if (messages.length && messages[messages.length-1].role === h.role) messages[messages.length-1].content += '\n' + h.content;
+      else messages.push({ role: h.role, content: h.content });
+    }
+    const userText = message || 'Please analyze this chart screenshot.';
+    let userContent = userText;
+    if (image) {
+      const m = String(image).match(/^data:(image\/\w+);base64,(.+)$/s);
+      if (m) userContent = [
+        { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
+        { type: 'text', text: userText }
+      ];
+    }
+    if (messages.length && messages[messages.length-1].role === 'user') messages.push({ role: 'assistant', content: '(continued)' });
+    messages.push({ role: 'user', content: userContent });
+
+    await pool.query('INSERT INTO coach_messages (user_id, role, content, has_image) VALUES ($1,$2,$3,$4)',
+      [req.user.id, 'user', userText + (image ? ' [chart screenshot attached]' : ''), !!image]);
+
+    let reply = '';
+    for (let i = 0; i < 6; i++) {
+      const resp = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6', max_tokens: 1200,
+        system: [
+          { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: dyn }
+        ],
+        tools: COACH_TOOLS, messages
+      });
+      const toolUses = resp.content.filter(b => b.type === 'tool_use');
+      const texts = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      if (resp.stop_reason !== 'tool_use' || !toolUses.length) { reply = texts; break; }
+      messages.push({ role: 'assistant', content: resp.content });
+      const results = [];
+      for (const tu of toolUses) {
+        let out;
+        try { out = await coachTool(tu.name, tu.input || {}, req.user.id); }
+        catch (e) { out = { error: 'tool failed' }; }
+        results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 12000) });
+      }
+      messages.push({ role: 'user', content: results });
+    }
+    if (!reply) reply = 'I hit a snag pulling your data — ask me that again.';
+
+    await pool.query('INSERT INTO coach_messages (user_id, role, content) VALUES ($1,$2,$3)', [req.user.id, 'assistant', reply]);
+    res.json({ reply, remaining: 29 - used });
+  } catch (err) {
+    console.error('Coach chat error:', err);
+    res.status(500).json({ error: 'Coach is unavailable right now' });
+  }
+});
+
+// ═══════════════════════════════════
 // SERVE FRONTEND
 // ═══════════════════════════════════
 
