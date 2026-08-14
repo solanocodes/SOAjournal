@@ -779,7 +779,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     const used = (await pool.query(
       "SELECT COUNT(*)::int AS c FROM coach_messages WHERE user_id = $1 AND role = 'user' AND created_at > NOW() - INTERVAL '24 hours'", [req.user.id]
     )).rows[0].c;
-    if (used >= 30) return res.status(429).json({ error: 'Daily coach limit reached — back tomorrow.' });
+    if (!req.user.is_mentor && used >= 30) return res.status(429).json({ error: 'Daily coach limit reached — back tomorrow.' });
 
     const memRows = (await pool.query(
       "SELECT kind, content, created_at FROM coach_memory WHERE user_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 60", [req.user.id]
