@@ -98,6 +98,26 @@ const initDB = async () => {
         journal_completions JSONB DEFAULT '{}'
       );
 
+      -- Coach chat messages
+      CREATE TABLE IF NOT EXISTS coach_messages (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(10) NOT NULL,
+        content TEXT NOT NULL,
+        has_image BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Coach structured memory
+      CREATE TABLE IF NOT EXISTS coach_memory (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Mentor notes table
       CREATE TABLE IF NOT EXISTS mentor_notes (
         id SERIAL PRIMARY KEY,
@@ -130,6 +150,8 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_daily_journals_user ON daily_journals(user_id);
       CREATE INDEX IF NOT EXISTS idx_badges_user ON badges(user_id);
       CREATE INDEX IF NOT EXISTS idx_milestones_user ON milestones(user_id);
+      CREATE INDEX IF NOT EXISTS idx_coach_messages_user ON coach_messages(user_id);
+      CREATE INDEX IF NOT EXISTS idx_coach_memory_user ON coach_memory(user_id);
     `);
     console.log('Database initialized successfully');
   } catch (err) {

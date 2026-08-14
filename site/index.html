@@ -270,6 +270,34 @@ input,select,textarea,button{font-family:inherit;outline:none}
 
 
 
+/* ═══ AI COACH CHAT ═══ */
+.coach{display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;max-width:860px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden}
+.coach-msgs{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.coach-loading{color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0}
+.coach-msg{display:flex}
+.coach-msg.me{justify-content:flex-end}
+.coach-bubble{max-width:82%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;color:var(--text-secondary);background:var(--bg-deep);border:1px solid var(--bg-elevated)}
+.coach-msg.me .coach-bubble{background:var(--bg-elevated);color:var(--text-primary);border-color:var(--border)}
+.coach-bubble strong{color:var(--text-primary)}
+.coach-chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 10px}
+.coach-chip{background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);font-size:12px;padding:6px 12px;cursor:pointer;transition:all .15s}
+.coach-chip:hover{border-color:var(--accent);color:var(--text-primary)}
+.coach-bar{display:flex;gap:10px;align-items:flex-end;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg-deep)}
+.coach-attach{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;flex:none}
+.coach-attach:hover{color:var(--accent);border-color:var(--accent)}
+.coach-input{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13.5px;padding:8px 12px;resize:none;min-height:34px;max-height:120px;font-family:inherit}
+.coach-input:focus{border-color:var(--accent)}
+.coach-imgprev{padding:0 22px}
+.coach-imgchip{position:relative;display:inline-block;margin-bottom:8px}
+.coach-imgchip img{height:52px;border-radius:6px;border:1px solid var(--border);display:block}
+.coach-imgchip button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:var(--bg-elevated);color:var(--text-primary);font-size:10px;cursor:pointer}
+.coach-dots{display:inline-flex;gap:4px;padding:4px 2px}
+.coach-dots i{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:coachBlink 1.2s infinite}
+.coach-dots i:nth-child(2){animation-delay:.2s}
+.coach-dots i:nth-child(3){animation-delay:.4s}
+@keyframes coachBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media(max-width:640px){.coach{height:calc(100vh - 210px)}}
+
 /* ═══ DAILY JOURNAL ═══ */
 .dj{max-width:800px;margin:0 auto}
 .dj-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;margin-bottom:20px;transition:color .15s}
@@ -1178,283 +1206,83 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
 }
 
 // ─── AI COACH ───
-function rCoach(el){if(!trades.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">🤖</div><h3 class="empty-title">Need more data</h3><p class="empty-text">Log some trades first</p></div>`;return}
-  const s=cStats(trades);const noStrat=trades.filter(t=>t.strategy==='No Strategy Used').length;
-  const streak=getStreakData();
-  const avgRules=trades.reduce((a,t)=>a+(t.rulesFollowed||[]).length,0)/trades.length;
-  const compPct=(avgRules/RL.length*100);
-  
-  // Day analysis
-  const dp={};trades.forEach(t=>{const k=dKey(t.date);if(!dp[k])dp[k]={p:0,c:0};dp[k].p+=t.pnl||0;dp[k].c++});
-  const days=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0]));
-  const greenDays=days.filter(([_,d])=>d.p>=0).length;
-  const redDays=days.filter(([_,d])=>d.p<0).length;
-  const avgTradesPerDay=days.length?(trades.length/days.length):0;
-  const overtradeDays=days.filter(([_,d])=>d.c>3).length;
-  
-  // Best/worst day
-  const bestDay=days.length?days.reduce((a,b)=>b[1].p>a[1].p?b:a):null;
-  const worstDay=days.length?days.reduce((a,b)=>b[1].p<a[1].p?b:a):null;
-  
-  // Strategy breakdown
-  const bySt={};
-  trades.forEach(t=>{const st=t.strategy||'No Strategy';if(!bySt[st])bySt[st]={p:0,c:0,w:0};bySt[st].p+=t.pnl||0;bySt[st].c++;if(t.pnl>0)bySt[st].w++});
-  const bestStrat=Object.entries(bySt).filter(([n])=>n!=='No Strategy Used').sort((a,b)=>b[1].p-a[1].p)[0];
-  const worstStrat=Object.entries(bySt).filter(([n])=>n!=='No Strategy Used').sort((a,b)=>a[1].p-b[1].p)[0];
-
-  // Emotion P&L correlation
-  const emoHigh=trades.filter(t=>(t.emotionRating||5)>=7);
-  const emoLow=trades.filter(t=>(t.emotionRating||5)<=4);
-  const emoHighAvg=emoHigh.length?emoHigh.reduce((a,t)=>a+(t.pnl||0),0)/emoHigh.length:0;
-  const emoLowAvg=emoLow.length?emoLow.reduce((a,t)=>a+(t.pnl||0),0)/emoLow.length:0;
-
-  // Friday analysis
-  const fridayTrades=trades.filter(t=>{const d=new Date(dKey(t.date).replace(/-/g,'/'));return d.getDay()===5});
-  const fridayPnl=fridayTrades.reduce((a,t)=>a+(t.pnl||0),0);
-
-  // Rule compliance per rule
-  const rc={};RL.forEach(r=>rc[r]={f:0,b:0,pb:0});
-  trades.forEach(t=>{RL.forEach(r=>{if((t.rulesFollowed||[]).includes(r))rc[r].f++;else{rc[r].b++;rc[r].pb+=t.pnl||0}})});
-  const worstRule=RL.map(r=>{const d=rc[r];const tot=d.f+d.b;return{name:r,pct:tot?(d.f/tot*100):100,cost:d.pb}}).sort((a,b)=>a.pct-b.pct)[0];
-
-  // Generate overall grade
-  let grade='F',gradeColor='var(--red)';
-  const gradeScore=(s.wr>=50?2:0)+(compPct>=70?2:0)+(s.avgEmo>=6?1:0)+(streak.current>=3?1:0)+(noStrat<=2?1:0)+(s.pf>=1.5?1:0)+(avgTradesPerDay<=3?1:0);
-  if(gradeScore>=8){grade='A+';gradeColor='var(--green)'}
-  else if(gradeScore>=6){grade='A';gradeColor='var(--green)'}
-  else if(gradeScore>=5){grade='B';gradeColor='var(--yellow)'}
-  else if(gradeScore>=3){grade='C';gradeColor='var(--yellow)'}
-  else if(gradeScore>=2){grade='D';gradeColor='var(--red)'}
-
-  el.innerHTML=`<div style="max-width:800px;margin:0 auto" class="fade-up">
-  <div style="text-align:center;margin-bottom:28px">
-    <h2 style="font-size:20px;font-weight:800;margin-bottom:4px">AI Trade Coach</h2>
-    <p style="color:var(--text-muted);font-size:12px;font-family:var(--mono)">Powered by the SOA trading system · ${s.tot} trades analyzed</p>
-  </div>
-  
-  <div style="display:flex;gap:12px;margin-bottom:24px;align-items:stretch">
-    <div class="card" style="flex:1;text-align:center;padding:20px;margin:0">
-      <div style="font-size:42px;font-weight:900;color:${gradeColor};font-family:'DM Sans',var(--sans)">${grade}</div>
-      <div style="font-size:10px;color:var(--text-muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Overall Grade</div>
+let _coachHist=null,_coachImg=null,_coachBusy=false;
+function rCoach(el){
+  el.innerHTML=`<div class="coach fade-up">
+    <div class="coach-msgs" id="coachMsgs"><div class="coach-loading">Loading your coach...</div></div>
+    <div class="coach-chips" id="coachChips"></div>
+    <div id="coachImgPrev" class="coach-imgprev"></div>
+    <div class="coach-bar">
+      <label class="coach-attach" title="Attach a chart screenshot">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
+        <input type="file" accept="image/*" style="display:none" onchange="coachPickImg(this)">
+      </label>
+      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask your coach anything — or drop in a chart screenshot" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
+      <button class="btn-primary" onclick="sendCoach()" id="coachSendBtn">Send</button>
     </div>
-    <div class="card" style="flex:2;padding:20px;margin:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;text-align:center">
-      <div><div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${s.np>=0?'var(--green)':'var(--red)'}">${f$(s.np)}</div><div style="font-size:10px;color:var(--text-muted);font-family:var(--mono);margin-top:2px">NET P&L</div></div>
-      <div><div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${s.wr>=50?'var(--green)':'var(--red)'}">${s.wr.toFixed(1)}%</div><div style="font-size:10px;color:var(--text-muted);font-family:var(--mono);margin-top:2px">WIN RATE</div></div>
-      <div><div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${streak.current>=5?'var(--green)':'var(--yellow)'}">${streak.current}🔥</div><div style="font-size:10px;color:var(--text-muted);font-family:var(--mono);margin-top:2px">STREAK</div></div>
-    </div>
-  </div>
-
-  ${noStrat>=2?`<div style="background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--yellow);display:flex;align-items:center;gap:8px"><strong>⚠</strong> ${noStrat} trades with no strategy. In the SOA system, every trade needs a defined setup.</div>`:''}
-  
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-    <div class="card" style="margin:0;padding:18px;cursor:pointer" onclick="toggleCoachSection('pat')" id="coach-pat-btn">
-      <div style="font-size:13px;font-weight:700;margin-bottom:3px">Pattern Analysis</div>
-      <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Best/worst tickers, strategies, direction bias</div>
-    </div>
-    <div class="card" style="margin:0;padding:18px;cursor:pointer" onclick="toggleCoachSection('emo')" id="coach-emo-btn">
-      <div style="font-size:13px;font-weight:700;margin-bottom:3px">Emotional Insights</div>
-      <div style="font-size:11px;color:var(--text-muted);line-height:1.5">How your mindset correlates with profit</div>
-    </div>
-    <div class="card" style="margin:0;padding:18px;cursor:pointer" onclick="toggleCoachSection('rul')" id="coach-rul-btn">
-      <div style="font-size:13px;font-weight:700;margin-bottom:3px">Rule Compliance</div>
-      <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Which rules you break and what it costs you</div>
-    </div>
-    <div class="card" style="margin:0;padding:18px;cursor:pointer" onclick="toggleCoachSection('soa')" id="coach-soa-btn">
-      <div style="font-size:13px;font-weight:700;margin-bottom:3px">SOA System Check</div>
-      <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Are you following the SOA system properly?</div>
-    </div>
-  </div>
-  <div id="coachOut"></div>
-</div>`}
-
-let activeCoachSection=null;
-function toggleCoachSection(type){
-  const o=document.getElementById('coachOut');
-  if(activeCoachSection===type){o.innerHTML='';activeCoachSection=null;return}
-  activeCoachSection=type;
-  o.innerHTML=`<div class="card"><div class="coach-typing"><span></span><span></span><span></span></div></div>`;
-  setTimeout(()=>{const s=cStats(trades);let a='';if(type==='pat')a=cPat(s);else if(type==='emo')a=cEmo();else if(type==='rul')a=cRul();else a=cSOA(s);o.innerHTML=`<div class="card fade-up" style="line-height:1.7;font-size:13px;color:var(--text-secondary)"><div class="coach-output">${a}</div></div>`},800)}
-
-function cPat(s){
-  const bt={};trades.forEach(t=>{if(!bt[t.ticker])bt[t.ticker]={p:0,w:0,c:0};bt[t.ticker].p+=t.pnl||0;bt[t.ticker].c++;if(t.pnl>0)bt[t.ticker].w++});
-  const best=Object.entries(bt).sort((a,b)=>b[1].p-a[1].p);
-  const bySt={};trades.forEach(t=>{const st=t.strategy||'Unknown';if(!bySt[st])bySt[st]={p:0,c:0,w:0};bySt[st].p+=t.pnl||0;bySt[st].c++;if(t.pnl>0)bySt[st].w++});
-  const longs=trades.filter(t=>t.direction==='Long'),shorts=trades.filter(t=>t.direction==='Short');
-  const longPnl=longs.reduce((a,t)=>a+(t.pnl||0),0),shortPnl=shorts.reduce((a,t)=>a+(t.pnl||0),0);
-  const dp={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+1});
-  const avgPerDay=Object.keys(dp).length?(trades.length/Object.keys(dp).length):0;
-  
-  let h='<h4 style="color:var(--text-primary);margin:0 0 12px">Pattern Analysis</h4>';
-  
-  // Ticker performance
-  if(best.length){
-    h+=`<strong style="color:var(--text-primary)">Ticker Performance</strong><br>`;
-    best.slice(0,5).forEach(([tk,d])=>{
-      const wr=(d.w/d.c*100).toFixed(0);
-      h+=`${d.p>=0?'<span style="color:var(--green)">▲</span>':'<span style="color:var(--red)">▼</span>'} <strong>${tk}</strong> — ${f$(d.p)} across ${d.c} trades (${wr}% WR)<br>`;
-    });
+  </div>`;
+  const box=el.querySelector('.coach');
+  box.addEventListener('dragover',e=>{e.preventDefault()});
+  box.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files.length)coachSetImg(e.dataTransfer.files[0])});
+  if(_coachHist){renderCoach()}else{
+    api('GET','/api/coach/history').then(d=>{_coachHist=d.messages||[];renderCoach()}).catch(()=>{_coachHist=[];renderCoach()});
   }
-  
-  // Direction bias
-  h+=`<br><strong style="color:var(--text-primary)">Direction Bias</strong><br>`;
-  h+=`Long: ${longs.length} trades → ${f$(longPnl)} | Short: ${shorts.length} trades → ${f$(shortPnl)}<br>`;
-  if(Math.abs(longPnl-shortPnl)>100){
-    h+=`<em>You're significantly better going ${longPnl>shortPnl?'long':'short'}. Consider focusing on ${longPnl>shortPnl?'long':'short'} setups in the SOA system.</em><br>`;
-  }
-  
-  // Strategy breakdown
-  h+=`<br><strong style="color:var(--text-primary)">Strategy Performance</strong><br>`;
-  Object.entries(bySt).sort((a,b)=>b[1].p-a[1].p).forEach(([st,d])=>{
-    const wr=(d.w/d.c*100).toFixed(0);
-    const icon=d.p>=0?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--red)">✕</span>';
-    h+=`${icon} <strong>${st}</strong> — ${d.c} trades, ${wr}% WR, ${f$(d.p/d.c)}/trade avg<br>`;
-  });
-  
-  // Trade frequency
-  h+=`<br><strong style="color:var(--text-primary)">Trade Frequency</strong><br>`;
-  h+=`Averaging ${avgPerDay.toFixed(1)} trades/day. `;
-  if(avgPerDay>3)h+=`<span style="color:var(--red)">That's too many. SOA rule: max 2-3 trades per day. "One A+ trade > 10 random trades."</span>`;
-  else if(avgPerDay<=2)h+=`<span style="color:var(--green)">Good discipline. You're being selective.</span>`;
-  else h+=`Reasonable, but could be more selective.`;
-  
-  return h;
 }
-
-function cEmo(){
-  const byR={};
-  trades.forEach(t=>{const r=t.emotionRating||5;const bucket=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';if(!byR[bucket])byR[bucket]={p:0,c:0,w:0};byR[bucket].p+=t.pnl||0;byR[bucket].c++;if(t.pnl>0)byR[bucket].w++});
-  
-  let h='<h4 style="color:var(--text-primary);margin:0 0 12px">Emotional Insights</h4>';
-  
-  h+=`<strong style="color:var(--text-primary)">P&L by Emotional State</strong><br>`;
-  ['Low (1-3)','Mid (4-6)','High (7-10)'].forEach(b=>{
-    const d=byR[b];if(!d)return;
-    const wr=(d.w/d.c*100).toFixed(0);
-    const avg=f$(d.p/d.c);
-    const icon=d.p>=0?'<span style="color:var(--green)">▲</span>':'<span style="color:var(--red)">▼</span>';
-    h+=`${icon} <strong>${b}</strong> — ${d.c} trades, ${wr}% WR, ${avg}/trade, total ${f$(d.p)}<br>`;
-  });
-  
-  const high=byR['High (7-10)'],low=byR['Low (1-3)'];
-  if(high&&low&&high.c>=2&&low.c>=2){
-    const diff=(high.p/high.c)-(low.p/low.c);
-    h+=`<br><strong style="color:var(--text-primary)">The Emotion Edge</strong><br>`;
-    h+=`When focused (7-10): ${f$(high.p/high.c)}/trade avg<br>`;
-    h+=`When tilted (1-3): ${f$(low.p/low.c)}/trade avg<br>`;
-    if(diff>0)h+=`<strong style="color:var(--green)">Your emotional awareness is worth ${f$(diff)} per trade.</strong> `;
-    h+=`<br><br>SOA psychological rule: <em>"If you're below a 6, you don't trade. Period. Your edge comes from waiting, not acting."</em>`;
+function coachMdEsc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
+function renderCoach(){
+  const m=document.getElementById('coachMsgs');if(!m)return;
+  if(!_coachHist.length){
+    m.innerHTML=`<div class="coach-msg ai"><div class="coach-bubble">I'm your **SOA Coach** — I can see every trade you've logged, your risk plan, and your journal.<br><br>Send anything to get started. If we haven't talked before, I'll ask a few quick questions so I know exactly what to help you with — your account, your entry model, your goals, and what to hold you accountable for.</div></div>`;
+  }else{
+    m.innerHTML=_coachHist.map(x=>`<div class="coach-msg ${x.role==='user'?'me':'ai'}"><div class="coach-bubble">${coachMdEsc(x.content)}</div></div>`).join('');
   }
-  
-  // Trading after losses
-  let revengeTrades=0,revengeP=0;
-  const sorted=[...trades].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id));
-  for(let i=1;i<sorted.length;i++){
-    if(sorted[i-1].pnl<0&&sorted[i].pnl<0&&dKey(sorted[i].date)===dKey(sorted[i-1].date)){
-      revengeTrades++;revengeP+=sorted[i].pnl||0;
-    }
-  }
-  if(revengeTrades>=2){
-    h+=`<br><br><strong style="color:var(--red)">Revenge Trading Detected</strong><br>`;
-    h+=`${revengeTrades} trades taken immediately after a loss on the same day. Total damage: ${f$(revengeP)}.<br>`;
-    h+=`<em>SOA rule: "You are trying to make it back. Stop." After 2 losses in a day, walk away.</em>`;
-  }
-  
-  return h;
+  renderCoachChips();
+  m.scrollTop=m.scrollHeight;
 }
-
-function cRul(){
-  const rc={};RL.forEach(r=>rc[r]={f:0,b:0,pf:0,pb:0});
-  trades.forEach(t=>{RL.forEach(r=>{if((t.rulesFollowed||[]).includes(r)){rc[r].f++;rc[r].pf+=t.pnl||0}else{rc[r].b++;rc[r].pb+=t.pnl||0}})});
-  
-  let h='<h4 style="color:var(--text-primary);margin:0 0 12px">Rule Compliance</h4>';
-  
-  const totalRules=trades.length*RL.length;
-  const followedTotal=Object.values(rc).reduce((a,d)=>a+d.f,0);
-  const overallPct=totalRules?(followedTotal/totalRules*100):0;
-  
-  h+=`<strong style="color:var(--text-primary)">Overall Compliance: <span style="color:${overallPct>=80?'var(--green)':overallPct>=50?'var(--yellow)':'var(--red)'}">${overallPct.toFixed(0)}%</span></strong><br><br>`;
-  
-  RL.forEach(r=>{
-    const d=rc[r],tot=d.f+d.b;if(!tot)return;
-    const pct=(d.f/tot*100);
-    const icon=pct>=80?'<span style="color:var(--green)">✓</span>':pct>=50?'<span style="color:var(--yellow)">~</span>':'<span style="color:var(--red)">✕</span>';
-    h+=`${icon} <strong>${r}</strong> — ${pct.toFixed(0)}% followed`;
-    if(d.b>0&&d.pb<0){
-      h+=` · <span style="color:var(--red)">costs ${f$(Math.abs(d.pb/d.b))}/trade when broken</span>`;
-    }
-    h+=`<br>`;
-  });
-  
-  // Most costly rule to break
-  const costliest=RL.map(r=>({name:r,...rc[r]})).filter(r=>r.b>0&&r.pb<0).sort((a,b)=>a.pb-b.pb)[0];
-  if(costliest){
-    h+=`<br><strong style="color:var(--text-primary)">Most Expensive Rule to Break</strong><br>`;
-    h+=`<span style="color:var(--red)">"${costliest.name}"</span> — broken ${costliest.b} times, costing you ${f$(Math.abs(costliest.pb))} total.<br>`;
-    h+=`<em>Fix this one rule and you'd recover ${f$(Math.abs(costliest.pb))} in P&L.</em>`;
-  }
-  
-  return h;
+function renderCoachChips(){
+  const c=document.getElementById('coachChips');if(!c)return;
+  if(_coachHist.length>4){c.innerHTML='';return}
+  const chips=[];
+  if(trades.length){
+    const un=trades.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length;
+    if(un/trades.length>=.3)chips.push('What are my untagged trades costing me?');
+    const dow={};trades.forEach(t=>{const k=dKey(t.date);if(!k)return;const[y,mo,d]=k.split('-').map(Number);const w=new Date(y,mo-1,d).getDay();if(!dow[w])dow[w]=0;dow[w]+=t.pnl||0});
+    const worst=Object.entries(dow).sort((a,b)=>a[1]-b[1])[0];
+    if(worst&&worst[1]<0)chips.push('Why do I lose money on '+['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'][worst[0]]+'?');
+    chips.push('Audit my last 10 trades');
+    chips.push('When should I take a withdrawal?');
+  }else chips.push('Help me get set up');
+  c.innerHTML=chips.map(q=>`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`).join('');
 }
-
-function cSOA(s){
-  let h='<h4 style="color:var(--text-primary);margin:0 0 12px">SOA System Check</h4>';
-  const checks=[];
-  const streak=getStreakData();
-  const dp={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+1});
-  const avgPerDay=Object.keys(dp).length?(trades.length/Object.keys(dp).length):0;
-  const noStrat=trades.filter(t=>t.strategy==='No Strategy Used').length;
-  const noStratPct=trades.length?(noStrat/trades.length*100):0;
-  const fridayTrades=trades.filter(t=>{const d=new Date(dKey(t.date).replace(/-/g,'/'));return d.getDay()===5});
-  const fridayPnl=fridayTrades.reduce((a,t)=>a+(t.pnl||0),0);
-  const avgRules=trades.reduce((a,t)=>a+(t.rulesFollowed||[]).length,0)/trades.length;
-  const compPct=(avgRules/RL.length*100);
-  
-  // Check 1: Strategy usage
-  if(noStratPct<=5)checks.push({pass:true,label:'Strategy on every trade',detail:`${(100-noStratPct).toFixed(0)}% of trades have a defined SOA strategy`});
-  else checks.push({pass:false,label:'Missing strategies on trades',detail:`${noStrat} trades (${noStratPct.toFixed(0)}%) with no strategy. SOA rule: "No setup = no trade"`});
-  
-  // Check 2: Trade frequency
-  if(avgPerDay<=3)checks.push({pass:true,label:'Trade frequency under control',detail:`${avgPerDay.toFixed(1)} trades/day avg — selective and disciplined`});
-  else checks.push({pass:false,label:'Overtrading detected',detail:`${avgPerDay.toFixed(1)} trades/day avg. SOA max is 2-3. "One A+ trade > 10 random trades"`});
-  
-  // Check 3: Emotional state
-  if(s.avgEmo>=6.5)checks.push({pass:true,label:'Emotional state is healthy',detail:`Avg emotion ${s.avgEmo.toFixed(1)}/10 — trading from a focused state`});
-  else checks.push({pass:false,label:'Emotional state below threshold',detail:`Avg emotion ${s.avgEmo.toFixed(1)}/10. Below 6 = stop trading. "You do not need to make money today"`});
-  
-  // Check 4: Rule compliance
-  if(compPct>=75)checks.push({pass:true,label:'Rule compliance is solid',detail:`${compPct.toFixed(0)}% overall compliance — following the system`});
-  else checks.push({pass:false,label:'Rule compliance needs work',detail:`${compPct.toFixed(0)}% compliance. SOA Step 10 requires consistent rule-following before sizing up`});
-  
-  // Check 5: Discipline streak
-  if(streak.current>=5)checks.push({pass:true,label:'Discipline streak active',detail:`${streak.current} day streak — consistency phase on track`});
-  else checks.push({pass:false,label:'No active discipline streak',detail:`Current streak: ${streak.current}d. SOA Step 10 requires 10-20 consecutive discipline days`});
-  
-  // Check 6: Friday trading
-  if(fridayTrades.length<=2||fridayPnl>=0)checks.push({pass:true,label:'Friday discipline',detail:fridayTrades.length?`${fridayTrades.length} Friday trades, ${f$(fridayPnl)} P&L`:'No Friday trades — smart'});
-  else if(fridayPnl<0)checks.push({pass:false,label:'Losing money on Fridays',detail:`${fridayTrades.length} Friday trades, ${f$(fridayPnl)}. SOA environment filter: Fridays = low probability`});
-  
-  // Check 7: Win rate
-  if(s.wr>=50)checks.push({pass:true,label:'Win rate is profitable',detail:`${s.wr.toFixed(1)}% — your selectivity is working`});
-  else checks.push({pass:false,label:'Win rate below 50%',detail:`${s.wr.toFixed(1)}%. Focus on A+ setups only. "Your edge comes from waiting, not acting"`});
-  
-  const passCount=checks.filter(c=>c.pass).length;
-  
-  h+=`<div style="margin-bottom:16px;font-size:14px"><strong style="color:var(--text-primary)">${passCount}/${checks.length} checks passing</strong></div>`;
-  
-  checks.forEach(c=>{
-    h+=`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;padding:10px 14px;background:${c.pass?'var(--green-bg)':'var(--red-bg)'};border:1px solid ${c.pass?'var(--green-border)':'var(--red-border)'};border-radius:var(--radius)">`;
-    h+=`<span style="font-size:14px;flex-shrink:0;margin-top:1px">${c.pass?'✓':'✕'}</span>`;
-    h+=`<div><strong style="color:var(--text-primary);font-size:12px">${c.label}</strong><br><span style="font-size:11px;color:var(--text-muted)">${c.detail}</span></div></div>`;
+function coachPickImg(input){if(input.files&&input.files[0])coachSetImg(input.files[0]);input.value=''}
+function coachSetImg(file){
+  compressImage(file,1000,0.65).then(dataUrl=>{
+    _coachImg=dataUrl;
+    const p=document.getElementById('coachImgPrev');
+    if(p)p.innerHTML=`<div class="coach-imgchip"><img src="${dataUrl}"><button onclick="_coachImg=null;this.parentElement.remove()">✕</button></div>`;
+  }).catch(err=>alert(err.message));
+}
+function sendCoach(){
+  if(_coachBusy)return;
+  const inp=document.getElementById('coachInput');
+  const text=(inp?inp.value:'').trim();
+  if(!text&&!_coachImg)return;
+  const img=_coachImg;_coachImg=null;
+  const prev=document.getElementById('coachImgPrev');if(prev)prev.innerHTML='';
+  if(inp)inp.value='';
+  _coachHist.push({role:'user',content:text||'[chart screenshot]'+(img?' attached':''),has_image:!!img});
+  const m=document.getElementById('coachMsgs');
+  if(m){renderCoach();m.insertAdjacentHTML('beforeend','<div class="coach-msg ai" id="coachTyping"><div class="coach-bubble"><span class="coach-dots"><i></i><i></i><i></i></span></div></div>');m.scrollTop=m.scrollHeight}
+  _coachBusy=true;const btn=document.getElementById('coachSendBtn');if(btn)btn.disabled=true;
+  api('POST','/api/coach/chat',{message:text,image:img||undefined}).then(d=>{
+    _coachHist.push({role:'assistant',content:d.reply});
+  }).catch(err=>{
+    _coachHist.push({role:'assistant',content:'**'+(err.message||'Coach is unavailable right now')+'**'});
+  }).finally(()=>{
+    _coachBusy=false;const b=document.getElementById('coachSendBtn');if(b)b.disabled=false;
+    const t=document.getElementById('coachTyping');if(t)t.remove();
+    renderCoach();
   });
-  
-  // Final verdict
-  h+=`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">`;
-  if(passCount>=6)h+=`<strong style="color:var(--green)">You're following the SOA system well.</strong> Keep doing what you're doing. "This system makes money from selectivity, not activity."`;
-  else if(passCount>=4)h+=`<strong style="color:var(--yellow)">Getting there, but not consistent yet.</strong> Focus on the failing checks above before thinking about sizing up. SOA Step 10 is about proving you can follow the rules every single day.`;
-  else h+=`<strong style="color:var(--red)">The SOA system isn't being followed consistently.</strong> Go back to basics: pick ONE strategy, follow all 8 rules, keep emotions above 6, and take max 2 trades per day. "A monkey can be profitable with proper psychology and risk management."`;
-  h+=`</div>`;
-  
-  return h;
 }
 
 // ─── BADGES ───
