@@ -325,7 +325,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .mem-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--bg-elevated);color:var(--text-secondary);font-size:12.5px;line-height:1.45}
 .mem-row button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px}
 .mem-row button:hover{color:var(--red)}
-.coach-input{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13.5px;padding:8px 12px;resize:none;min-height:34px;max-height:120px;font-family:inherit}
+.coach-input{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13.5px;padding:8px 12px;resize:none;min-height:34px;max-height:170px;overflow-y:auto;font-family:inherit;line-height:1.45}
 .coach-input:focus{border-color:var(--accent)}
 .coach-imgprev{padding:0 22px}
 .coach-imgchip{position:relative;display:inline-block;margin-bottom:8px}
@@ -1313,7 +1313,7 @@ function rCoach(el){
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
         <input type="file" accept="image/*,.docx,.txt,.md" style="display:none" onchange="coachPickImg(this)">
       </label>
-      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask Delta anything — or drop a chart screenshot or notes document (.docx)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
+      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask Delta anything — or drop a chart screenshot or notes document (.docx)" oninput="coachGrow(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
       <button class="btn-primary" onclick="sendCoach()" id="coachSendBtn">Send</button>
     </div>
   </div>`;
@@ -1363,6 +1363,7 @@ function renderCoachChips(){
     return`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`;
   }).join('');
 }
+function coachGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,170)+'px'}
 let _coachRec=null;
 function coachToggleMic(btn){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1372,7 +1373,7 @@ function coachToggleMic(btn){
   const base=inp&&inp.value?inp.value.replace(/\s+$/,'')+' ':'';
   let finalT='';
   const rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang='en-US';
-  rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)finalT+=r[0].transcript;else interim+=r[0].transcript}if(inp)inp.value=base+finalT+interim};
+  rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)finalT+=r[0].transcript;else interim+=r[0].transcript}if(inp){inp.value=base+finalT+interim;coachGrow(inp)}};
   rec.onend=()=>{_coachRec=null;const b=document.getElementById('coachMicBtn');if(b)b.classList.remove('rec')};
   rec.onerror=()=>{rec.onend()};
   _coachRec=rec;rec.start();btn.classList.add('rec');
@@ -1407,7 +1408,7 @@ function sendCoach(){
   const img=_coachImg;_coachImg=null;
   const doc=_coachDoc;_coachDoc=null;
   const prev=document.getElementById('coachImgPrev');if(prev)prev.innerHTML='';
-  if(inp)inp.value='';
+  if(inp){inp.value='';inp.style.height='auto'}
   _coachHist.push({role:'user',content:(text||(doc?'Document upload':'Analyze this chart.'))+(doc?' [document attached: '+doc.name+']':''),has_image:!!img,img:img||null});
   const m=document.getElementById('coachMsgs');
   if(m){renderCoach();m.insertAdjacentHTML('beforeend','<div class="coach-msg ai" id="coachTyping"><div class="coach-bubble"><span class="coach-dots"><i></i><i></i><i></i></span></div></div>');m.scrollTop=m.scrollHeight}
