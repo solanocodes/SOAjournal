@@ -1064,7 +1064,7 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=_t?_t.l.replace('★ ',''):'Dashboard';const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=_t?_t.l.replace('★ ',''):'Dashboard';const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){curAccount=v?parseInt(v):null;localStorage.setItem('soa_acct',v||'');trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;ren()}
@@ -1270,7 +1270,7 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
 let _coachHist=null,_coachImg=null,_coachDoc=null,_coachBusy=false;
 function rCoach(el){
   el.innerHTML=`<div class="coach fade-up">
-    <div class="coach-msgs" id="coachMsgs"><div class="coach-loading">Loading your coach...</div></div>
+    <div class="coach-msgs" id="coachMsgs"><div class="coach-loading">Loading Delta...</div></div>
     <div class="coach-chips" id="coachChips"></div>
     <div id="coachImgPrev" class="coach-imgprev"></div>
     <div class="coach-bar">
@@ -1281,7 +1281,7 @@ function rCoach(el){
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
         <input type="file" accept="image/*,.docx,.txt,.md" style="display:none" onchange="coachPickImg(this)">
       </label>
-      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask your coach anything — or drop a chart screenshot or notes document (.docx)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
+      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask Delta anything — or drop a chart screenshot or notes document (.docx)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
       <button class="btn-primary" onclick="sendCoach()" id="coachSendBtn">Send</button>
     </div>
   </div>`;
@@ -1296,7 +1296,7 @@ function coachMdEsc(t){const d=document.createElement('div');d.textContent=t;ret
 function renderCoach(){
   const m=document.getElementById('coachMsgs');if(!m)return;
   if(!_coachHist.length){
-    m.innerHTML=`<div class="coach-msg ai"><div class="coach-bubble">I'm your **SOA Coach** — I can see every trade you've logged, your risk plan, and your journal.<br><br>Send anything to get started. If we haven't talked before, I'll ask a few quick questions so I know exactly what to help you with — your account, your entry model, your goals, and what to hold you accountable for.</div></div>`;
+    m.innerHTML=`<div class="coach-msg ai"><div class="coach-bubble">I'm **Delta** — your SOA trading coach. I can see every trade you've logged, your risk plan, and your journal.<br><br>Send anything to get started. If we haven't talked before, I'll ask a few quick questions so I know exactly what to help you with — your account, your entry model, your goals, and what to hold you accountable for.</div></div>`;
   }else{
     m.innerHTML=_coachHist.map(x=>`<div class="coach-msg ${x.role==='user'?'me':'ai'}"><div class="coach-bubble">${coachMdEsc(x.content)}</div></div>`).join('');
   }
@@ -1474,8 +1474,8 @@ function loadMentorInsights(){
   const el=document.getElementById('mentorInsights');if(!el)return;
   const render=list=>{
     const issues=list.filter(x=>x.overTradeDays7||x.lossBreachDays7||(x.journalGapDays!=null&&x.journalGapDays>=3)||x.journalGapDays==null);
-    if(!issues.length){el.innerHTML='<div class="mi-clear">Coach report: no flags this week — everyone journaling and inside their limits.</div>';return}
-    el.innerHTML='<div class="mi-title">Coach flags · last 7 days</div>'+issues.map(x=>{
+    if(!issues.length){el.innerHTML='<div class="mi-clear">Delta reports no flags this week — everyone journaling and inside their limits.</div>';return}
+    el.innerHTML='<div class="mi-title">Delta\'s flags · last 7 days</div>'+issues.map(x=>{
       const bits=[];
       if(x.journalGapDays==null)bits.push('never journaled');
       else if(x.journalGapDays>=3)bits.push('no journal in '+x.journalGapDays+' days');
@@ -1486,7 +1486,7 @@ function loadMentorInsights(){
     }).join('');
   };
   if(_mentorInsights){render(_mentorInsights);return}
-  el.innerHTML='<div class="mi-clear">Loading coach flags…</div>';
+  el.innerHTML='<div class="mi-clear">Loading Delta\'s flags…</div>';
   api('GET','/api/mentor/insights').then(d=>{_mentorInsights=d||[];render(_mentorInsights)}).catch(()=>{el.innerHTML=''});
 }
 function loadStuDetail(id,username){if(_cachedStudentDetail[username])return;api('GET','/api/mentor/student/'+id).then(data=>{_cachedStudentDetail[username]=data;const now=new Date();_stuCalY[username]=now.getFullYear();_stuCalM[username]=now.getMonth();ren()}).catch(err=>console.error(err))}
@@ -1825,7 +1825,7 @@ const WT_STEPS=[
   {target:'.nav-btn[data-view="calendar"]',title:'Calendar',desc:'See your P&L for every trading day. Green = profit, red = loss. <strong>Click any day with trades to open your Daily Journal</strong> — where you\'ll review trades, rate your emotions, get AI analysis, and write your lessons learned.',position:'bottom'},
   {target:'.nav-btn[data-view="trades"]',title:'Trade Log & Daily Journal',desc:'All your trades in one place. When you click a day from the calendar, your trades AND your daily journal appear here — emotions, lessons, and AI analysis.',position:'bottom'},
   {target:'.btn-import',title:'Import Trades',desc:'Import your trades from Tradovate, TopStepX, or Webull. Upload your CSV, review each trade, tag your strategy and emotions, then import.',position:'bottom'},
-  {target:'.nav-btn[data-view="coach"]',title:'AI Trade Coach',desc:'Your personal trading analyst. Gets pattern analysis, emotional insights, rule compliance breakdown, and an SOA system check — all powered by your actual data.',position:'bottom'},
+  {target:'.nav-btn[data-view="coach"]',title:'Delta — Your AI Coach',desc:'Your personal trading analyst. Gets pattern analysis, emotional insights, rule compliance breakdown, and an SOA system check — all powered by your actual data.',position:'bottom'},
   {target:'.nav-btn[data-view="risk"]',title:'Risk Plan',desc:'Define your max loss per trade, per day, and per week. Set your account size and watch your risk status update in real-time as you trade.',position:'bottom'},
   {target:'.nav-btn[data-view="badges"]',title:'Badges & Milestones',desc:'Earn achievements as you trade — from your first $500 to $100K, discipline streaks, win rate milestones, and more. Milestones post to Discord automatically.',position:'bottom'},
   {target:'.nav-btn[data-view="reports"]',title:'Reports',desc:'Generate daily recap cards and weekly report cards. Download, copy, or share them directly to Discord. Plus your A+ Setup Library lives here.',position:'bottom'},
@@ -2605,8 +2605,8 @@ function rSettings(el){
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px">What your coach knows</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Everything the AI Coach has saved about you — your profile, playbook, commitments, and flags. Remove anything that's wrong or outdated.</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">What Delta knows about you</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Everything Delta has saved about you — your profile, playbook, commitments, and flags. Remove anything that's wrong or outdated.</div>
       <div id="coachMemList" style="font-size:13px;color:var(--text-muted)">Loading…</div>
     </div>
     
