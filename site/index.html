@@ -295,6 +295,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 10px}
 .coach-chip{background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);font-size:12px;padding:6px 12px;cursor:pointer;transition:all .15s}
 .coach-chip:hover{border-color:var(--accent);color:var(--text-primary)}
+.coach-chip.debrief{border-color:var(--accent);color:var(--accent);font-weight:600}
 .coach-bar{display:flex;gap:10px;align-items:flex-end;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg-deep)}
 .coach-attach{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;flex:none}
 .coach-attach:hover{color:var(--accent);border-color:var(--accent)}
@@ -1285,8 +1286,13 @@ function renderCoach(){
 }
 function renderCoachChips(){
   const c=document.getElementById('coachChips');if(!c)return;
-  if(_coachHist.length>4){c.innerHTML='';return}
+  const today=new Date();const tk=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const todayTrades=_allTrades.filter(t=>dKey(t.date)===tk);
+  const dj=_cachedJournals[tk]||{};
+  const needsDebrief=todayTrades.length&&!(dj.lessons||dj.satisfaction);
+  if(_coachHist.length>4){c.innerHTML=needsDebrief?'<button class="coach-chip debrief" onclick="document.getElementById(\'coachInput\').value=this.dataset.q;sendCoach()" data-q="Let\'s debrief my day">Debrief today\'s '+todayTrades.length+' trades →</button>':'';return}
   const chips=[];
+  if(needsDebrief)chips.push('DEBRIEF::Debrief today\'s '+todayTrades.length+' trades →');
   if(trades.length){
     const un=trades.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length;
     if(un/trades.length>=.3)chips.push('What are my untagged trades costing me?');
@@ -1296,7 +1302,10 @@ function renderCoachChips(){
     chips.push('Audit my last 10 trades');
     chips.push('When should I take a withdrawal?');
   }else chips.push('Help me get set up');
-  c.innerHTML=chips.map(q=>`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`).join('');
+  c.innerHTML=chips.map(q=>{
+    if(q.startsWith('DEBRIEF::'))return`<button class="coach-chip debrief" onclick="document.getElementById('coachInput').value='Let\'s debrief my day';sendCoach()">${q.slice(9)}</button>`;
+    return`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`;
+  }).join('');
 }
 function coachPickImg(input){if(input.files&&input.files[0])coachSetImg(input.files[0]);input.value=''}
 function coachSetImg(file){
@@ -1320,6 +1329,7 @@ function sendCoach(){
   _coachBusy=true;const btn=document.getElementById('coachSendBtn');if(btn)btn.disabled=true;
   api('POST','/api/coach/chat',{message:text,image:img||undefined}).then(d=>{
     _coachHist.push({role:'assistant',content:d.reply});
+    if(/journal|debrief/i.test(d.reply))api('GET','/api/journals').then(j=>{_cachedJournals=j||_cachedJournals}).catch(()=>{});
   }).catch(err=>{
     _coachHist.push({role:'assistant',content:'**'+(err.message||'Coach is unavailable right now')+'**'});
   }).finally(()=>{

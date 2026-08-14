@@ -544,6 +544,8 @@ You have tools that query the trader's REAL data. Rules for you:
 - When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
 - If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
 
+DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
+
 INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
 
 Style: direct, specific, mentor voice. Short paragraphs. Plain text with **bold** for emphasis. No emoji, no headers. Under 250 words unless performing a requested audit.`;
@@ -569,6 +571,16 @@ const COACH_TOOLS = [
       rule: { type: 'string', enum: ['max_trades_per_day', 'min_emotion', 'skip_untagged', 'skip_day'], description: 'max_trades_per_day: only first N trades each day. min_emotion: only trades with emotion >= N. skip_untagged: drop trades with no strategy. skip_day: drop trades on a weekday (value = day name).' },
       value: { type: 'string', description: 'N for numeric rules, weekday name for skip_day' }
     }, required: ['rule'] } },
+  { name: 'save_journal', description: 'Write or update the trader\'s daily journal for a date. Merges with any existing entry — only provided fields change. This is how debrief conversations become journal entries.',
+    input_schema: { type: 'object', properties: {
+      date: { type: 'string', description: 'YYYY-MM-DD' },
+      satisfaction: { type: 'number', description: '1-5 stars, rate discipline quality of the day' },
+      emotions: { type: 'array', items: { type: 'string', enum: ['Calm','Confident','Focused','Patient','Satisfied','Excited','Anxious','Frustrated','Impatient','Overwhelmed','Distracted','Disappointed'] } },
+      biases: { type: 'array', items: { type: 'string', enum: ['Overtrading','Revenge Trading','FOMO','Impatience','Hesitation','Greed','Fear','Loss Aversion','Confirmation Bias','Anchoring Bias','Recency Bias','Sunk Cost Fallacy'] } },
+      lessons: { type: 'string', description: 'The lesson learned, in the trader\'s own words where possible' },
+      observations: { type: 'string', description: 'Market/behavior observations from the debrief' },
+      gameplan: { type: 'string', description: 'Tomorrow\'s plan' }
+    }, required: ['date'] } },
   { name: 'remember', description: 'Save a durable fact about this trader to your long-term memory.',
     input_schema: { type: 'object', properties: {
       kind: { type: 'string', enum: ['profile', 'playbook', 'commitment', 'flag', 'question'] },
@@ -641,6 +653,25 @@ async function coachTool(name, input, userId) {
     const hypo = aggr(kept);
     return { actual_pnl: actual, hypothetical_pnl: hypo.total_pnl, difference: +(hypo.total_pnl - actual).toFixed(2),
       trades_kept: hypo.count, trades_dropped: tr.length - hypo.count, hypothetical_win_rate: hypo.win_rate };
+  }
+  if (name === 'save_journal') {
+    const d = String(input.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { error: 'invalid date' };
+    const cur = (await pool.query('SELECT * FROM daily_journals WHERE user_id = $1 AND date = $2', [userId, d])).rows[0] || {};
+    const sat = input.satisfaction != null ? Math.max(1, Math.min(5, Math.round(input.satisfaction))) : (cur.satisfaction || 0);
+    const emo = Array.isArray(input.emotions) && input.emotions.length ? input.emotions.slice(0, 6) : (cur.emotions || []);
+    const bia = Array.isArray(input.biases) && input.biases.length ? input.biases.slice(0, 6) : (cur.biases || []);
+    const les = input.lessons != null ? String(input.lessons).slice(0, 2000) : (cur.lessons || '');
+    const obs = input.observations != null ? String(input.observations).slice(0, 2000) : (cur.observations || '');
+    const gp = input.gameplan != null ? String(input.gameplan).slice(0, 2000) : (cur.gameplan || '');
+    await pool.query(
+      `INSERT INTO daily_journals (user_id, date, satisfaction, emotions, biases, lessons, observations, gameplan)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         satisfaction=EXCLUDED.satisfaction, emotions=EXCLUDED.emotions, biases=EXCLUDED.biases,
+         lessons=EXCLUDED.lessons, observations=EXCLUDED.observations, gameplan=EXCLUDED.gameplan`,
+      [userId, d, sat, emo, bia, les, obs, gp]);
+    return { saved: true, date: d };
   }
   if (name === 'remember') {
     const kinds = ['profile','playbook','commitment','flag','question'];
