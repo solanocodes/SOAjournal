@@ -1097,6 +1097,72 @@ app.post('/api/accounts/:id/sync', authMiddleware, async (req, res) => {
 });
 
 // ═══════════════════════════════════
+// DISCORD ROLL CALL
+// ═══════════════════════════════════
+
+function etParts() {
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
+    weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const parts = {};
+  f.formatToParts(new Date()).forEach(x => { parts[x.type] = x.value; });
+  return parts;
+}
+
+async function postRollCall() {
+  const hook = process.env.DISCORD_ROLLCALL_WEBHOOK;
+  if (!hook) return { error: 'DISCORD_ROLLCALL_WEBHOOK is not set in the environment' };
+  const p = etParts();
+  const dateKey = `${p.year}-${p.month}-${p.day}`;
+  const users = (await pool.query('SELECT id, username, first_name FROM users WHERE is_mentor = FALSE')).rows;
+  if (!users.length) return { error: 'No students yet' };
+  const done = (await pool.query(
+    "SELECT DISTINCT user_id FROM daily_journals WHERE date = $1 AND (satisfaction > 0 OR lessons <> '')", [dateKey]
+  )).rows.map(r => r.user_id);
+  const journaled = users.filter(u => done.includes(u.id));
+  const nm = u => u.first_name || u.username;
+  let names = journaled.slice(0, 30).map(u => '✅ ' + nm(u)).join(' · ');
+  if (journaled.length > 30) names += ` · +${journaled.length - 30} more`;
+  const desc = (journaled.length
+    ? names + `\n\n**${journaled.length} of ${users.length}** traders debriefed today.`
+    : `**0 of ${users.length}** journals in — the room went quiet today.`)
+    + '\n\nNot on the list? Go to https://app.simplyoptionsacademy.com to get your journal done.';
+  const embed = {
+    title: `📋 Today's Journals — ${p.weekday} ${p.month}/${p.day}`,
+    description: desc,
+    color: journaled.length >= users.length / 2 ? 0x6fb083 : 0xc0a55f,
+    footer: { text: 'SOA Trading Journal · debrief with Delta in 2 minutes' }
+  };
+  const r = await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'SOA Journal', embeds: [embed] }) });
+  if (!r.ok) return { error: 'Discord returned ' + r.status };
+  await pool.query("INSERT INTO app_state (key, value) VALUES ('rollcall_last', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [dateKey]);
+  return { success: true, journaled: journaled.length, of: users.length };
+}
+
+function startRollCall() {
+  setInterval(async () => {
+    try {
+      const p = etParts();
+      if (p.weekday === 'Sat' || p.weekday === 'Sun') return;
+      if (p.hour !== '17' || p.minute !== '30') return;
+      const dateKey = `${p.year}-${p.month}-${p.day}`;
+      const last = (await pool.query("SELECT value FROM app_state WHERE key = 'rollcall_last'")).rows[0];
+      if (last && last.value === dateKey) return;
+      const out = await postRollCall();
+      if (out.error) console.error('Roll call:', out.error); else console.log('Roll call posted:', out.journaled + '/' + out.of);
+    } catch (e) { console.error('Roll call error:', e.message); }
+  }, 60000);
+}
+
+app.post('/api/mentor/rollcall', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const out = await postRollCall();
+    if (out.error) return res.status(400).json(out);
+    res.json(out);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ═══════════════════════════════════
 // SERVE FRONTEND
 // ═══════════════════════════════════
 
@@ -1129,6 +1195,7 @@ async function start() {
     }
   };
   tryInit(1);
+  startRollCall();
 }
 
 start();
