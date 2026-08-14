@@ -242,96 +242,6 @@ input,select,textarea,button{font-family:inherit;outline:none}
 
 
 
-/* ═══ MINI ROADMAP WIDGET ═══ */
-.mini-roadmap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.mini-roadmap:hover{border-color:var(--border-hover)}
-.mini-roadmap::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);border-radius:0 2px 2px 0}
-.mini-rm-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.mini-rm-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em}
-.mini-rm-pct{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--accent)}
-.mini-rm-step{display:flex;align-items:center;gap:14px;margin-bottom:14px}
-.mini-rm-node{width:40px;height:40px;border-radius:50%;background:var(--accent-glow);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:900;color:var(--accent);flex-shrink:0;animation:pulse-ring 2.5s infinite}
-.mini-rm-info h4{font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 2px}
-.mini-rm-info p{font-size:11px;color:var(--text-muted);margin:0}
-.mini-rm-bar{height:6px;background:var(--bg-deep);border-radius:3px;overflow:hidden;margin-bottom:10px}
-.mini-rm-bar-fill{height:100%;background:linear-gradient(90deg,#059669,#22c55e);border-radius:3px;transition:width .6s ease}
-.mini-rm-steps{display:flex;gap:4px;align-items:center}
-.mini-rm-dot{width:8px;height:8px;border-radius:50%;transition:all .2s}
-.mini-rm-dot.done{background:var(--accent)}
-.mini-rm-dot.current{background:var(--accent);box-shadow:0 0 6px rgba(34,197,94,0.5)}
-.mini-rm-dot.locked{background:var(--bg-deep);border:1px solid var(--border)}
-.mini-rm-cta{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
-.mini-rm-cta span{font-size:12px;font-weight:700;color:var(--accent)}
-
-
-/* ═══ ROADMAP INTRO ANIMATION ═══ */
-.rm-intro{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;background:#020805;display:flex;align-items:center;justify-content:center;flex-direction:column}
-.rm-intro-content{text-align:center;opacity:0}
-.rm-intro-line{width:60px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 20px;opacity:0;transform:scaleX(0)}
-.rm-intro-step{font-family:var(--mono);font-size:12px;color:#4d7a5c;text-transform:uppercase;letter-spacing:.2em;opacity:0;transform:translateY(10px)}
-.rm-intro-title{font-size:32px;font-weight:900;color:#e8f5ec;margin:8px 0;opacity:0;transform:translateY(10px)}
-.rm-intro-sub{font-size:14px;color:#5a7d66;opacity:0;transform:translateY(10px);max-width:400px;margin:0 auto;line-height:1.6}
-.rm-intro-glow{position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 70%);pointer-events:none;opacity:0}
-.rm-intro.playing .rm-intro-glow{animation:rmGlowIn 2s ease forwards}
-.rm-intro.playing .rm-intro-content{animation:rmContentIn .8s ease .3s forwards}
-.rm-intro.playing .rm-intro-line{animation:rmLineIn .6s ease .5s forwards}
-.rm-intro.playing .rm-intro-step{animation:rmTextIn .5s ease .7s forwards}
-.rm-intro.playing .rm-intro-title{animation:rmTextIn .5s ease .9s forwards}
-.rm-intro.playing .rm-intro-sub{animation:rmTextIn .5s ease 1.1s forwards}
-.rm-intro.exiting{animation:rmFadeOut .5s ease forwards}
-.rm-intro.exiting .rm-intro-content{animation:rmContentOut .4s ease forwards}
-
-@keyframes rmGlowIn{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
-@keyframes rmContentIn{0%{opacity:0}100%{opacity:1}}
-@keyframes rmLineIn{0%{opacity:0;transform:scaleX(0)}100%{opacity:1;transform:scaleX(1)}}
-@keyframes rmTextIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-@keyframes rmFadeOut{0%{opacity:1}100%{opacity:0}}
-@keyframes rmContentOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0.98)}}
-
-.rm-intro-particles{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;overflow:hidden}
-.rm-intro-particle{position:absolute;width:2px;height:2px;background:#22c55e;border-radius:50%;opacity:0;animation:rmParticle 3s ease infinite}
-@keyframes rmParticle{0%{opacity:0;transform:translateY(0)}20%{opacity:.6}80%{opacity:.3}100%{opacity:0;transform:translateY(-100px)}}
-
-/* ═══ SOA ROADMAP ═══ */
-.roadmap{max-width:680px;margin:0 auto;position:relative;padding:0 0 40px}
-.roadmap-header{text-align:center;margin-bottom:36px}
-.roadmap-header h2{font-size:22px;font-weight:800;margin-bottom:6px}
-.roadmap-header p{color:var(--text-muted);font-size:13px}
-.roadmap-progress{display:flex;align-items:center;gap:12px;justify-content:center;margin-top:16px}
-.roadmap-progress-bar{width:200px;height:8px;background:var(--bg-deep);border-radius:4px;overflow:hidden}
-.roadmap-progress-fill{height:100%;background:linear-gradient(90deg,#059669,#22c55e);border-radius:4px;transition:width .6s ease}
-.roadmap-progress-text{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)}
-.roadmap-line{position:absolute;left:36px;top:180px;bottom:40px;width:3px;background:var(--bg-elevated);border-radius:2px}
-.roadmap-line-fill{width:100%;background:linear-gradient(to bottom,#22c55e,#059669);border-radius:2px;transition:height .6s ease}
-.rm-step{display:flex;gap:20px;margin-bottom:8px;position:relative;z-index:1}
-.rm-node{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;transition:all .3s;cursor:pointer;position:relative;font-family:var(--mono)}
-.rm-node-locked{background:var(--bg-deep);border:2px solid var(--border);color:var(--text-muted)}
-.rm-node-current{background:var(--accent-glow);border:3px solid var(--accent);color:var(--accent);animation:pulse-ring 2s infinite;box-shadow:0 0 20px rgba(34,197,94,0.2)}
-.rm-node-done{background:var(--accent);border:2px solid var(--accent);color:#fff}
-.rm-node:hover{transform:scale(1.08)}
-.rm-card{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;transition:all .2s;cursor:pointer;overflow:hidden}
-.rm-card:hover{border-color:var(--border-hover)}
-.rm-card.current{border-color:var(--accent);background:linear-gradient(135deg,rgba(34,197,94,0.05),transparent)}
-.rm-card.done{opacity:.75}
-.rm-card.done:hover{opacity:1}
-.rm-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
-.rm-card-phase{font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 8px;border-radius:4px;display:inline-block}
-.rm-phase-foundation{color:#22c55e;background:rgba(34,197,94,0.1)}
-.rm-phase-strategy{color:#3b82f6;background:rgba(59,130,246,0.1)}
-.rm-phase-execution{color:#f59e0b;background:rgba(245,158,11,0.1)}
-.rm-phase-mastery{color:#a855f7;background:rgba(168,85,247,0.1)}
-.rm-card-status{font-family:var(--mono);font-size:10px;font-weight:700}
-.rm-card-title{font-size:16px;font-weight:800;margin-bottom:4px;color:var(--text-primary)}
-.rm-card-desc{font-size:12px;color:var(--text-muted);line-height:1.6}
-.rm-card-expanded{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);animation:fadeIn .3s ease}
-.rm-card-checklist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
-.rm-check-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;padding:6px 8px;border-radius:6px;transition:all .15s}
-.rm-check-item:hover{background:var(--accent-soft)}
-.rm-check-icon{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .15s}
-.rm-check-item.checked .rm-check-icon{background:var(--accent);border-color:var(--accent);color:#fff}
-.rm-card-btn{margin-top:12px;display:flex;gap:8px}
-
-
 /* ═══ DAILY JOURNAL ═══ */
 .dj{max-width:800px;margin:0 auto}
 .dj-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;margin-bottom:20px;transition:color .15s}
@@ -363,6 +273,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dj-textarea:focus{border-color:var(--accent);outline:none}
 .dj-textarea::placeholder{color:var(--text-muted)}
 .dj-ai{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;line-height:1.7;font-size:13px;color:var(--text-secondary)}
+.ai-loading-spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .dj-ai h4{color:var(--text-primary);font-size:14px;margin:14px 0 6px;font-weight:700}
 .dj-ai h4:first-child{margin-top:0}
 .dj-ai strong{color:var(--text-primary)}
@@ -421,7 +333,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 
 /* ═══ TRADE SCREENSHOTS ═══ */
 .screenshot-upload{border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;cursor:pointer;transition:all .15s;margin-top:6px}
-.screenshot-upload:hover{border-color:var(--border-hover);background:var(--accent-soft)}
+.screenshot-upload:hover,.screenshot-upload.dragover{border-color:var(--border-hover);background:var(--accent-soft)}
 .screenshot-upload-text{font-size:11px;color:var(--text-muted);font-family:var(--mono)}
 .screenshot-preview{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .screenshot-thumb{position:relative;width:90px;height:60px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
@@ -871,6 +783,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
       </div>
       <div id="tab-notes" style="display:none">
         <div class="field"><label>Trade Notes & Reflection</label><textarea id="f-notes" placeholder="What did you observe? What went right or wrong? What would you do differently?"></textarea></div>
+        <div class="field" id="modal-screenshots-field" style="display:none"><label>Screenshots</label><div id="modal-screenshots" class="trade-screenshots"></div></div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn-sm" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="saveTrade()" id="btnSave">Log Trade</button></div>
@@ -890,17 +803,17 @@ async function api(method,path,body){
   if(!res.ok)throw new Error(data.error||'API error');
   return data;
 }
-let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRoadmap=[],_cachedRiskPlan={},_cachedSettings={};
+let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRiskPlan={},_cachedSettings={};
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
 async function loadAllData(){
   try{
-    const [tradeData,journalData,badgeData,milestoneData,roadmapData,riskData,settingsData]=await Promise.all([
+    const [tradeData,journalData,badgeData,milestoneData,riskData,settingsData]=await Promise.all([
       api('GET','/api/trades'),api('GET','/api/journals'),api('GET','/api/badges'),
-      api('GET','/api/milestones'),api('GET','/api/roadmap'),api('GET','/api/riskplan'),api('GET','/api/settings')
+      api('GET','/api/milestones'),api('GET','/api/riskplan'),api('GET','/api/settings')
     ]);
     trades=tradeData||[];_cachedJournals=journalData||{};_cachedBadges=badgeData||{};
-    _cachedMilestones=milestoneData||{};_cachedRoadmap=roadmapData||[];
+    _cachedMilestones=milestoneData||{};
     _cachedRiskPlan=riskData||{};_cachedSettings=settingsData||{};_dataLoaded=true;
   }catch(err){console.error('Failed to load data:',err);trades=[];_dataLoaded=true}
 }
@@ -928,7 +841,7 @@ const BD=[
 const TICK_VALUES={ES:12.50,MES:1.25,NQ:5.00,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:10.00,MCL:1.00,GC:10.00,MGC:1.00,SI:25.00,NG:10.00};
 const TICK_SIZES={ES:0.25,MES:0.25,NQ:0.25,MNQ:0.25,YM:1.00,MYM:1.00,RTY:0.10,M2K:0.10,CL:0.01,MCL:0.01,GC:0.10,MGC:0.10,SI:0.005,NG:0.001};
 // Round-trip all-in fees per contract (commission + exchange + clearing + NFA)
-const DEFAULT_RT_FEES={ES:5.00,NQ:5.00,MES:0.50,MNQ:0.50,YM:5.00,MYM:0.50,RTY:5.00,M2K:0.50,CL:5.00,MCL:0.50,GC:5.00,MGC:0.50,SI:5.00,NG:5.00};
+const DEFAULT_RT_FEES={ES:5.00,NQ:5.00,MES:1.90,MNQ:1.90,YM:5.00,MYM:1.90,RTY:5.00,M2K:1.90,CL:5.00,MCL:1.90,GC:5.00,MGC:1.90,SI:5.00,NG:5.00};
 function getUserRT(){return(_cachedSettings&&_cachedSettings.customFees)||{}}
 function saveUserRT(f){if(!_cachedSettings)_cachedSettings={};_cachedSettings.customFees=f;api('POST','/api/settings',_cachedSettings).catch(err=>console.error(err))}
 function getRT(){const u=getUserRT();return{...DEFAULT_RT_FEES,...u}}
@@ -1027,8 +940,9 @@ function allStu(){return Object.keys(gUsers()).filter(n=>n!==MENTOR)}
 
 function gId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function f$(v){const n=Number(v);if(isNaN(n))return'$0.00';return(n<0?'-':'')+'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
-function fD(d){if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d)){const[y,m,dy]=d.slice(0,10).split('-').map(Number);return new Date(y,m-1,dy).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
-function dKey(d){if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d))return d.slice(0,10);const t=new Date(d);return`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`}
+function fD(d){d=normalizeDate(d);if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d)){const[y,m,dy]=d.slice(0,10).split('-').map(Number);return new Date(y,m-1,dy).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+function dKey(d){d=normalizeDate(d);if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d))return d.slice(0,10);const t=new Date(d);if(isNaN(t))return'';return`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`}
+function normalizeDate(d){if(!d)return'';if(typeof d==='string'){if(/^\d{4}-\d{2}-\d{2}/.test(d))return d.slice(0,10);const m=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0')}return d}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function cStreak(tr){const bd={};tr.forEach(t=>{const k=dKey(t.date);(bd[k]=bd[k]||[]).push(t)});let s=0;for(const d of Object.keys(bd).sort().reverse()){if(bd[d].every(t=>(t.rulesFollowed||[]).length>=5))s++;else break}return s}
 function weekTr(tr){const n=new Date(),w=new Date(n);w.setDate(w.getDate()-7);return tr.filter(t=>new Date(t.date)>=w&&new Date(t.date)<=n)}
@@ -1047,9 +961,9 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'roadmap',l:'Roadmap'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('')}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('')}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,roadmap:rRoadmap,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
 
 // ─── STATS ───
 function cStats(tr){const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<0);const wr=tr.length?w.length/tr.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length,sk,ar,avgEmo,em,st,cv}}
@@ -1096,43 +1010,7 @@ function rDash(el){
     return`<div class="strat-item"><div><div class="strat-name">${esc(name)}</div><div class="strat-meta">${d.t} trades · ${wr.toFixed(0)}% WR</div></div><div class="strat-pnl" style="color:${d.p>=0?'var(--green)':'var(--red)'}">${f$(d.p)}</div></div>`;
   }).join('');
   
-  // Build mini roadmap widget
-  const rmProgress=getRoadmapProgress();
-  let rmTotal=0,rmDone=0,rmCurrentStep=11,rmCurrentTitle='';
-  ROADMAP_STEPS.forEach(step=>{
-    const stepDone=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    step.checklist.forEach((_,i)=>{rmTotal++;if(rmProgress[step.id]&&rmProgress[step.id][i])rmDone++});
-    if(!stepDone&&rmCurrentStep===11){rmCurrentStep=step.id;rmCurrentTitle=step.title}
-  });
-  if(rmDone===rmTotal&&rmTotal>0){rmCurrentStep=11;rmCurrentTitle='Gradual Size Increase'}
-  const rmPct=rmTotal?(rmDone/rmTotal*100):0;
-  const rmDots=ROADMAP_STEPS.map(step=>{
-    const done=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    const cur=step.id===rmCurrentStep;
-    return`<div class="mini-rm-dot ${done?'done':cur?'current':'locked'}"></div>`;
-  }).join('');
-  const rmChecked=ROADMAP_STEPS.filter(s=>s.checklist.every((_,i)=>rmProgress[s.id]&&rmProgress[s.id][i])).length;
-  const rmPhase=rmCurrentStep<=3?'Foundation':rmCurrentStep<=5?'Strategy':rmCurrentStep<=8?'Execution':'Mastery';
-  
   el.innerHTML=`
-    <div class="mini-roadmap fade-up" onclick="sv('roadmap')">
-      <div class="mini-rm-top">
-        <span class="mini-rm-label">🗺️ SOA Journey — ${rmPhase} Phase</span>
-        <span class="mini-rm-pct">${rmPct.toFixed(0)}%</span>
-      </div>
-      <div class="mini-rm-step">
-        <div class="mini-rm-node">${rmCurrentStep}</div>
-        <div class="mini-rm-info">
-          <h4>Step ${rmCurrentStep}: ${rmCurrentTitle}</h4>
-          <p>${rmChecked} of 11 steps completed</p>
-        </div>
-      </div>
-      <div class="mini-rm-bar"><div class="mini-rm-bar-fill" style="width:${rmPct}%"></div></div>
-      <div class="mini-rm-cta">
-        <div class="mini-rm-steps">${rmDots}</div>
-        <span>Continue Journey →</span>
-      </div>
-    </div>
     <div class="dash-hero fade-up">
       <div class="dash-hero-label">Total Net P&L</div>
       <div class="dash-hero-pnl ${s.np>=0?'positive':'negative'}">${f$(s.np)}</div>
@@ -1184,10 +1062,10 @@ function rDash(el){
 }
 
 // ─── CALENDAR ───
-function rCal(el){const fi=new Date(calY,calM,1),la=new Date(calY,calM+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;const jd=getDJ(k);const hasJournal=jd.satisfaction||jd.lessons||jd.observations||(jd.emotions&&jd.emotions.length);const hasPM=jd.pmBias||jd.pmLevels||jd.pmGoals;c+=`<div class="cal-day ${h?(p>=0?'green clickable':'red clickable'):'pre-clickable'}${hasJournal?' journaled':''}" onclick="${h?`filterDate='${k}';sv('trades')`:`openPreMarket('${k}')`}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:`${hasPM?'<span class="cal-pm-dot">PM ✓</span>':''}`}</div>`}el.innerHTML=`<div class="cal-nav fade-up"><button class="cal-nav-btn" onclick="calM--;if(calM<0){calM=11;calY--}ren()">◀</button><h3 class="cal-month">${mn}</h3><button class="cal-nav-btn" onclick="calM++;if(calM>11){calM=0;calY++}ren()">▶</button></div><div class="cal-grid fade-up" style="animation-delay:.1s">${c}</div><div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-muted);opacity:.7">Click a trading day for post-session journal · Click an empty day for pre-market plan</div>`}
+function rCal(el){const fi=new Date(calY,calM,1),la=new Date(calY,calM+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};trades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;const jd=getDJ(k);const hasJournal=jd.satisfaction||jd.lessons||jd.observations||(jd.emotions&&jd.emotions.length);const hasPM=jd.pmBias||jd.pmLevels||jd.pmGoals;const _now=new Date();_now.setHours(0,0,0,0);const isPast=new Date(calY,calM,d)<=_now;c+=`<div class="cal-day ${h?(p>=0?'green clickable':'red clickable'):(isPast?'clickable':'pre-clickable')}${hasJournal?' journaled':''}" onclick="${h||isPast?`filterDate='${k}';sv('trades')`:`openPreMarket('${k}')`}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:`${hasPM?'<span class="cal-pm-dot">PM ✓</span>':''}`}</div>`}el.innerHTML=`<div class="cal-nav fade-up"><button class="cal-nav-btn" onclick="calM--;if(calM<0){calM=11;calY--}ren()">◀</button><h3 class="cal-month">${mn}</h3><button class="cal-nav-btn" onclick="calM++;if(calM>11){calM=0;calY++}ren()">▶</button></div><div class="cal-grid fade-up" style="animation-delay:.1s">${c}</div><div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-muted);opacity:.7">Click any day to journal · Future empty days open pre-market plan</div>`}
 
 // ─── TRADE LIST ───
-function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[...trades];fi.sort((a,b)=>new Date(b.date)-new Date(a.date));let h='';if(filterDate)h+=`<div class="filter-bar"><span>Trades for ${fD(filterDate)}</span><button class="btn-sm" onclick="filterDate=null;ren()">Show all</button></div>`;if(!fi.length){h+=`<div class="empty-state fade-up"><div class="empty-icon">📝</div><h3 class="empty-title">${filterDate?'No trades this day':'No trades yet'}</h3><p class="empty-text">Click "+ New Trade" or "Import CSV"</p></div>`;el.innerHTML=h;return}h+='<div class="trade-list">';fi.forEach((t,i)=>{const tw=t.totw;const strat=t.strategy||t.setupQuality||'';const emoR=t.emotionRating||5;h+=`<div class="trade-row${tw?' totw':''} fade-up stagger-${Math.min(i+1,8)}">${tw?'<div class="totw-badge">⭐ TRADE OF THE WEEK</div>':''}<div class="trade-row-left"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'}</div><div><div><span class="trade-ticker">${esc(t.ticker)}</span><span class="trade-inst">${esc(t.instrument)}</span></div><div class="trade-date">${fD(t.date)}</div></div></div><div class="trade-row-center"><span class="tag tag-setup">${esc(strat)}</span><span class="tag tag-emotion" style="color:${emoColor(emoR)}">Emotion: ${emoR}/10</span></div><div class="trade-row-right"><div class="trade-pnl" style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div><div class="trade-rules-ct">${(t.rulesFollowed||[]).length}/${RL.length} rules</div></div><div class="trade-row-actions">${(t.screenshots&&t.screenshots.length)?`<span style="font-size:10px;color:var(--text-muted)">📷${t.screenshots.length}</span>`:''}<button class="btn-icon edit" onclick="editTr('${t.id}')">✎</button><button class="btn-icon del" onclick="delTr('${t.id}')">✕</button></div></div>`;const cm=gCmt(t.id);if(cm.length){h+=`<div style="margin:-4px 0 8px 46px"><div class="comment-list">${cm.map(c=>`<div class="comment-item"><div class="comment-author">★ ${esc(c.a)}</div><div class="comment-text">${esc(c.t)}</div><div class="comment-time">${fD(c.d)}</div></div>`).join('')}</div></div>`}});h+='</div>';
+function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[...trades];fi.sort((a,b)=>new Date(b.date)-new Date(a.date));let h='';if(filterDate)h+=`<div class="filter-bar"><span>Trades for ${fD(filterDate)}</span><button class="btn-sm" onclick="filterDate=null;ren()">Show all</button></div>`;if(!fi.length&&!filterDate){h+=`<div class="empty-state fade-up"><div class="empty-icon">📝</div><h3 class="empty-title">No trades yet</h3><p class="empty-text">Click "+ New Trade" or "Import CSV"</p></div>`;el.innerHTML=h;return}if(!fi.length&&filterDate){h+=`<div class="card fade-up" style="text-align:center;padding:24px"><div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--text-primary)">No trades on ${fD(filterDate)}</div><div style="font-family:var(--mono);font-size:12px;color:var(--text-muted);margin-bottom:14px">Choosing not to trade is still a decision worth journaling</div><div style="display:flex;gap:8px;justify-content:center"><button class="btn-sm" onclick="openPreMarket('${filterDate}')">📋 Pre-Market Plan</button></div></div>`}if(fi.length){h+='<div class="trade-list">';fi.forEach((t,i)=>{const tw=t.totw;const strat=t.strategy||t.setupQuality||'';const emoR=t.emotionRating||5;h+=`<div class="trade-row${tw?' totw':''} fade-up stagger-${Math.min(i+1,8)}">${tw?'<div class="totw-badge">⭐ TRADE OF THE WEEK</div>':''}<div class="trade-row-left"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'}</div><div><div><span class="trade-ticker">${esc(t.ticker)}</span><span class="trade-inst">${esc(t.instrument)}</span></div><div class="trade-date">${fD(t.date)}</div></div></div><div class="trade-row-center"><span class="tag tag-setup">${esc(strat)}</span><span class="tag tag-emotion" style="color:${emoColor(emoR)}">Emotion: ${emoR}/10</span></div><div class="trade-row-right"><div class="trade-pnl" style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div><div class="trade-rules-ct">${(t.rulesFollowed||[]).length}/${RL.length} rules</div></div><div class="trade-row-actions">${(t.screenshots&&t.screenshots.length)?`<span style="font-size:10px;color:var(--text-muted)">📷${t.screenshots.length}</span>`:''}<button class="btn-icon edit" onclick="editTr('${t.id}')">✎</button><button class="btn-icon del" onclick="delTr('${t.id}')">✕</button></div></div>${(t.screenshots&&t.screenshots.length)?`<div class="trade-screenshots" style="margin:-4px 0 8px 46px">${t.screenshots.map(img=>`<img src="${img}" onclick="openScreenshot(this.src)" alt="Trade screenshot">`).join('')}</div>`:''}`;const cm=gCmt(t.id);if(cm.length){h+=`<div style="margin:-4px 0 8px 46px"><div class="comment-list">${cm.map(c=>`<div class="comment-item"><div class="comment-author">★ ${esc(c.a)}</div><div class="comment-text">${esc(c.t)}</div><div class="comment-time">${fD(c.d)}</div></div>`).join('')}</div></div>`}});h+='</div>'}
   // If filtering by date, show Daily Journal below trades
   if(filterDate){
     const dayTrades=trades.filter(t=>dKey(t.date)===filterDate);
@@ -1205,38 +1083,40 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
     const selBiases=dj.biases||[];
     const biasChips=DJ_BIASES.map(b=>`<div class="dj-chip warn${selBiases.includes(b)?' selected':''}" onclick="toggleDJChip('${filterDate}','biases','${b}')">${b}</div>`).join('');
     const aiAnalysis=generateDailyAI(dayTrades,dj);
-    
+
     h+=`<div style="margin-top:28px;padding-top:24px;border-top:2px solid var(--border)">
       <div style="text-align:center;margin-bottom:24px">
         <div style="font-size:18px;font-weight:800;margin-bottom:4px">📓 Daily Journal — ${fD(filterDate)}</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">Review your day, reflect on your decisions, and plan for tomorrow</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${dayTrades.length?'Review your day, reflect on your decisions, and plan for tomorrow':'No trades today — reflect on your decision to stay flat and plan ahead'}</div>
       </div>
-      
-      <div class="dj-summary" style="margin-bottom:24px">
+
+      ${dayTrades.length?`<div class="dj-summary" style="margin-bottom:24px">
         <div class="dj-summary-item"><div class="dj-summary-val" style="color:${tp>=0?'var(--green)':'var(--red)'}">${f$(tp)}</div><div class="dj-summary-label">Net P&L</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val">${wr.toFixed(1)}%</div><div class="dj-summary-label">Win Rate</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val">${wins} / ${losses}</div><div class="dj-summary-label">W / L</div></div>
         <div class="dj-summary-item"><div class="dj-summary-val"><span style="color:var(--green)">${f$(avgWin)}</span> / <span style="color:var(--red)">${f$(avgLoss)}</span></div><div class="dj-summary-label">Avg W/L</div></div>
-      </div>
-      
-      <div class="dj-section"><div class="dj-section-title">⭐ Trading Satisfaction</div><div class="dj-stars">${starHTML}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai">${aiAnalysis}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">😤 Post-Trading Emotions</div><div class="dj-chips">${emoChips}</div></div>
-      
+      </div>`:''}
+
+      <div class="dj-section"><div class="dj-section-title">⭐ ${dayTrades.length?'Trading':'Daily'} Satisfaction</div><div class="dj-stars">${starHTML}</div></div>
+
+      ${dayTrades.length?`<div class="dj-section"><div class="dj-section-title">🤖 AI Daily Analysis</div><div class="dj-ai" id="ai-analysis-${filterDate}">${_aiCache[filterDate]||aiAnalysis}</div></div>`:''}
+
+      <div class="dj-section"><div class="dj-section-title">😤 ${dayTrades.length?'Post-Trading ':''}Emotions</div><div class="dj-chips">${emoChips}</div></div>
+
       <div class="dj-section"><div class="dj-section-title">⚠️ Emotional Biases Experienced</div><div class="dj-chips">${biasChips}</div></div>
-      
-      <div class="dj-section"><div class="dj-section-title">📝 Lessons Learned</div><textarea class="dj-textarea" placeholder="What did you learn from today's trades? What would you do differently?" oninput="saveDJText('${filterDate}','lessons',this.value)">${esc(dj.lessons||'')}</textarea></div>
-      
-      <div class="dj-section"><div class="dj-section-title">👁️ Observations</div><textarea class="dj-textarea" placeholder="What patterns or behaviors did you notice today?" oninput="saveDJText('${filterDate}','observations',this.value)">${esc(dj.observations||'')}</textarea></div>
-      
+
+      <div class="dj-section"><div class="dj-section-title">📝 Lessons Learned</div><textarea class="dj-textarea" placeholder="${dayTrades.length?'What did you learn from today\'s trades? What would you do differently?':'Why did you choose not to trade today? What did you observe in the market?'}" oninput="saveDJText('${filterDate}','lessons',this.value)">${esc(dj.lessons||'')}</textarea></div>
+
+      <div class="dj-section"><div class="dj-section-title">👁️ Observations</div><textarea class="dj-textarea" placeholder="${dayTrades.length?'What patterns or behaviors did you notice today?':'What market patterns did you notice? Any setups you watched but passed on?'}" oninput="saveDJText('${filterDate}','observations',this.value)">${esc(dj.observations||'')}</textarea></div>
+
       <div class="dj-section"><div class="dj-section-title">🎯 Tomorrow's Game Plan</div><textarea class="dj-textarea" placeholder="What's your plan for tomorrow? Key levels? Max trades? Any goals?" oninput="saveDJText('${filterDate}','gameplan',this.value)">${esc(dj.gameplan||'')}</textarea></div>
-      
+
       <div style="text-align:center;padding:16px 0;font-family:var(--mono);font-size:11px;color:var(--text-muted)">✓ Auto-saved</div>
     </div>`;
   }
-  el.innerHTML=h}
+  el.innerHTML=h;
+  if(filterDate){const _dt=trades.filter(t=>dKey(t.date)===filterDate);if(_dt.length)setTimeout(()=>fetchLLMAnalysis(filterDate,_dt,getDJ(filterDate)),100)}
+}
 
 // ─── AI COACH ───
 function rCoach(el){if(!trades.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">🤖</div><h3 class="empty-title">Need more data</h3><p class="empty-text">Log some trades first</p></div>`;return}
@@ -1609,16 +1489,6 @@ function generateMentorPDF(){
   const dateStr=now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   const streak=getStreakData();
   const rp=getRiskPlan();
-  const rmProgress=getRoadmapProgress();
-  
-  // Roadmap progress
-  let rmTotal=0,rmDone=0,rmCurrentStep=11,rmCurrentTitle='Gradual Size Increase';
-  ROADMAP_STEPS.forEach(step=>{
-    const stepDone=step.checklist.every((_,i)=>rmProgress[step.id]&&rmProgress[step.id][i]);
-    step.checklist.forEach((_,i)=>{rmTotal++;if(rmProgress[step.id]&&rmProgress[step.id][i])rmDone++});
-    if(!stepDone&&rmCurrentStep===11){rmCurrentStep=step.id;rmCurrentTitle=step.title}
-  });
-  const rmPct=rmTotal?(rmDone/rmTotal*100):0;
 
   // Strategy breakdown
   const byStrat={};
@@ -1672,8 +1542,7 @@ function generateMentorPDF(){
           <div style="font-size:11px;color:${MUT};font-family:monospace;margin-top:3px">Student: <strong style="color:${TXT}">${curUser}</strong> · ${dateStr}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:11px;color:${MUT};font-family:monospace">Roadmap: <strong style="color:${G}">${rmPct.toFixed(0)}%</strong> · Step ${rmCurrentStep}</div>
-          <div style="font-size:11px;color:${MUT};font-family:monospace;margin-top:2px">Streak: <strong style="color:${streak.current>=5?G:Y}">${streak.current}d</strong> · Best: ${streak.best}d</div>
+          <div style="font-size:11px;color:${MUT};font-family:monospace">Streak: <strong style="color:${streak.current>=5?G:Y}">${streak.current}d</strong> · Best: ${streak.best}d</div>
         </div>
       </div>
 
@@ -1879,9 +1748,6 @@ const MILESTONES=[
   
   // Journal Engagement
   {id:'first_journal',icon:'📓',title:'First Daily Journal!',desc:'You completed your first daily journal entry. Reflection is where growth happens.',check:t=>{return Object.values(_cachedJournals||{}).some(d=>d.lessons||d.observations||d.satisfaction)}},
-  {id:'roadmap_25',icon:'🗺️',title:'25% Roadmap Complete!',desc:'Quarter of the SOA journey done. You\'re building a foundation.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=25}},
-  {id:'roadmap_50',icon:'🛤️',title:'50% Roadmap Complete!',desc:'Halfway through the SOA system. The hardest part is behind you.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&(done/total*100)>=50}},
-  {id:'roadmap_100',icon:'🎓',title:'SOA Graduate!',desc:'100% of the roadmap complete. You\'ve mastered the entire SOA system.',check:t=>{const p=getRoadmapProgress();let total=0,done=0;ROADMAP_STEPS.forEach(s=>{s.checklist.forEach((_,i)=>{total++;if(p[s.id]&&p[s.id][i])done++})});return total&&done===total}},
 ];
 
 function chkMilestones(){
@@ -1935,14 +1801,12 @@ function showCelebration(milestone){
 const WT_STEPS=[
   {target:null,title:'Welcome to the SOA Trading Journal',desc:'This quick tour will show you how everything works. It takes about 60 seconds and will help you get the most out of your journal.',position:'center'},
   {target:'.nav-btn[data-view="dashboard"]',title:'Dashboard',desc:'Your home base. See your total P&L, win rate, discipline streak, equity curve, and strategy performance — all at a glance.',position:'bottom'},
-  {target:'.mini-roadmap',title:'SOA Journey Tracker',desc:'Tracks your progress through the 11-step SOA system. Click it to open the full roadmap with checklists for each step.',position:'bottom'},
   {target:'.nav-btn[data-view="calendar"]',title:'Calendar',desc:'See your P&L for every trading day. Green = profit, red = loss. <strong>Click any day with trades to open your Daily Journal</strong> — where you\'ll review trades, rate your emotions, get AI analysis, and write your lessons learned.',position:'bottom'},
   {target:'.nav-btn[data-view="trades"]',title:'Trade Log & Daily Journal',desc:'All your trades in one place. When you click a day from the calendar, your trades AND your daily journal appear here — emotions, lessons, and AI analysis.',position:'bottom'},
   {target:'.btn-import',title:'Import Trades',desc:'Import your trades from Tradovate, TopStepX, or Webull. Upload your CSV, review each trade, tag your strategy and emotions, then import.',position:'bottom'},
   {target:'.nav-btn[data-view="coach"]',title:'AI Trade Coach',desc:'Your personal trading analyst. Gets pattern analysis, emotional insights, rule compliance breakdown, and an SOA system check — all powered by your actual data.',position:'bottom'},
   {target:'.nav-btn[data-view="risk"]',title:'Risk Plan',desc:'Define your max loss per trade, per day, and per week. Set your account size and watch your risk status update in real-time as you trade.',position:'bottom'},
   {target:'.nav-btn[data-view="badges"]',title:'Badges & Milestones',desc:'Earn achievements as you trade — from your first $500 to $100K, discipline streaks, win rate milestones, and more. Milestones post to Discord automatically.',position:'bottom'},
-  {target:'.nav-btn[data-view="roadmap"]',title:'SOA Roadmap',desc:'The full 11-step SOA journey. Complete checklists for each step as you progress from setup to mastery. Your mentor can see your progress in your report.',position:'bottom'},
   {target:'.nav-btn[data-view="reports"]',title:'Reports',desc:'Generate daily recap cards and weekly report cards. Download, copy, or share them directly to Discord. Plus your A+ Setup Library lives here.',position:'bottom'},
   {target:'.btn-mentor-report',title:'Send to Mentor',desc:'One click generates a comprehensive report with all your stats, strategies, emotions, rule compliance, and screenshots. Downloads as an image you can send to your mentor on Discord.',position:'bottom'},
   {target:null,title:'You\'re all set!',desc:'Start by importing your first CSV or logging a trade manually. The more data you log, the smarter the AI Coach gets. Welcome to SOA.',position:'center'}
@@ -2067,11 +1931,10 @@ function checkJournalCompletion(date){
       if(dow===0||dow===6){check.setDate(check.getDate()-1);continue}
       const dayJ=getDJ(key);
       const complete=dayJ.satisfaction||(dayJ.emotions&&dayJ.emotions.length)||(dayJ.lessons&&dayJ.lessons.trim().length>10);
-      // Also need trades on that day
       const dayTrades=trades.filter(t=>dKey(t.date)===key);
-      if(complete&&dayTrades.length>0){jStreak++;check.setDate(check.getDate()-1)}
+      if(complete){jStreak++;check.setDate(check.getDate()-1)}
       else if(dayTrades.length>0&&!complete){break}
-      else{check.setDate(check.getDate()-1);if(i>0)break}
+      else{check.setDate(check.getDate()-1);continue}
     }
     
     showJournalComplete(date,jStreak);
@@ -2227,179 +2090,6 @@ function buildStreakWidget(){
   </div>`;
 }
 
-// ═══ SOA ROADMAP ═══
-const ROADMAP_STEPS=[
-  {id:1,title:'Platform & Tools Setup',desc:'Set up your brokerage, TradingView structure, indicators, and all the software you need to trade the SOA system.',phase:'Foundation',phaseClass:'foundation',checklist:['Brokerage account created','TradingView setup correctly','Indicators configured','Platform walkthrough completed']},
-  {id:2,title:'Account & Risk Reality',desc:'Define your account size, risk tolerance, emotional triggers, and build your trading plan. Know your max loss per trade and per day before you ever enter a position.',phase:'Foundation',phaseClass:'foundation',checklist:['Account size defined','Max loss per trade set','Max loss per day set','Risk tolerance documented','Trading plan written']},
-  {id:3,title:'Market Structure',desc:'Learn how to identify trend on higher time frames, when NOT to trade, and when to be aggressive. This saves you a ton of time and money.',phase:'Foundation',phaseClass:'foundation',checklist:['Higher time frame trend identification','Know when to avoid trading','Understand market sessions','Market structure quiz passed']},
-  {id:4,title:'Key Levels & Liquidity',desc:'Master the exact levels used every day in the SOA system. Order blocks, liquidity zones — no more drawing random lines everywhere.',phase:'Strategy',phaseClass:'strategy',checklist:['Key levels identification mastered','Order blocks understood','Fibonacci levels mapped','Level drawing practice completed']},
-  {id:5,title:'A+ Setup Definition',desc:'Know exactly what an A+ setup looks like vs what is NOT tradeable. This is where you learn to be selective and only take the best.',phase:'Strategy',phaseClass:'strategy',checklist:['A+ setup criteria memorized','Can identify non-tradeable setups','Size rules understood','Setup identification quiz passed']},
-  {id:6,title:'Entry & Confirmation Rules',desc:'The precision of the SOA strategy. Signal candles, entry candles, confirmation logic — no more impulsive entries.',phase:'Execution',phaseClass:'execution',checklist:['Signal candle identification','Entry candle rules learned','Confirmation logic mastered','Paper traded 10+ entries']},
-  {id:7,title:'Stop Loss & Position Sizing',desc:'Dollar-based risk, fixed stop logic, and why you should never resize mid-trade. Set it and forget it — emotionless.',phase:'Execution',phaseClass:'execution',checklist:['Dollar-based risk calculated','Fixed stop logic implemented','Position sizing formula memorized','No mid-trade resizing commitment']},
-  {id:8,title:'Trade Limits',desc:'Know exactly when to stop during your day, how many trades to take, and what your size should be until you see consistent success.',phase:'Execution',phaseClass:'execution',checklist:['Daily trade limit set','Know when to stop trading','Size limits defined','Rules written and posted']},
-  {id:9,title:'Journaling & Review',desc:'Review every single trade. Understand why trades are taken, what emotional states you are in, and what rules you followed. This is where real growth happens.',phase:'Mastery',phaseClass:'mastery',checklist:['SOA Journal set up','First week of trades logged','First AI Coach review completed','Mentor report sent']},
-  {id:10,title:'Consistency Phase',desc:'10 to 20 discipline days with no rule-breaking, flat emotions, small daily profits. When it starts feeling boring — that means it is working.',phase:'Mastery',phaseClass:'mastery',checklist:['5-day discipline streak','10-day discipline streak','20-day discipline streak','Consistent small green days']},
-  {id:11,title:'Gradual Size Increase',desc:'The stairstep scaling system. Move from small size to bigger size following the stairs — never jumping straight to large size.',phase:'Mastery',phaseClass:'mastery',checklist:['Stairstep levels defined with mentor','First size increase completed','Maintained discipline at new size','Scaled to target size']},
-];
-
-let expandedStep=null;
-function getRoadmapProgress(){const p={};(_cachedRoadmap||[]).forEach(r=>{const step=ROADMAP_STEPS[r.step_index];if(step){if(!p[step.id])p[step.id]={};p[step.id][r.item_index]=true}});return p}
-function saveRoadmapProgress(p){const c=[];ROADMAP_STEPS.forEach((s,si)=>{if(p[s.id]){Object.keys(p[s.id]).forEach(ii=>{if(p[s.id][ii])c.push({step_index:si,item_index:parseInt(ii)})})}});_cachedRoadmap=c}
-
-let rmIntroPlayed=false;
-function rRoadmap(el){
-  if(!rmIntroPlayed){
-    rmIntroPlayed=true;
-    showRoadmapIntro(el);
-    return;
-  }
-  rRoadmapContent(el);
-}
-
-function showRoadmapIntro(el){
-  const progress=getRoadmapProgress();
-  let currentStep=11,currentTitle='Gradual Size Increase';
-  for(const step of ROADMAP_STEPS){
-    const stepDone=step.checklist.every((_,i)=>progress[step.id]&&progress[step.id][i]);
-    if(!stepDone){currentStep=step.id;currentTitle=step.title;break}
-  }
-  const phase=currentStep<=3?'Foundation':currentStep<=5?'Strategy':currentStep<=8?'Execution':'Mastery';
-  const quotes=[
-    'Discipline is the bridge between goals and accomplishment.',
-    'The goal is not to trade more. It is to trade with structure.',
-    'Consistency beats intensity every single time.',
-    'Small profits compound into life-changing results.',
-    'Trust the process. Trust the system.'
-  ];
-  const quote=quotes[Math.floor(Math.random()*quotes.length)];
-  
-  // Generate particles
-  let particles='';
-  for(let i=0;i<30;i++){
-    const left=Math.random()*100;
-    const delay=Math.random()*2;
-    const duration=2+Math.random()*2;
-    const bottom=Math.random()*40;
-    particles+=`<div class="rm-intro-particle" style="left:${left}%;bottom:${bottom}%;animation-delay:${delay}s;animation-duration:${duration}s"></div>`;
-  }
-  
-  el.innerHTML='';
-  const intro=document.createElement('div');
-  intro.className='rm-intro';
-  intro.innerHTML=`
-    <div class="rm-intro-glow"></div>
-    <div class="rm-intro-particles">${particles}</div>
-    <div class="rm-intro-content">
-      <div class="rm-intro-line"></div>
-      <div class="rm-intro-step">${phase} Phase · Step ${currentStep}</div>
-      <div class="rm-intro-title">${currentTitle}</div>
-      <div class="rm-intro-sub">${quote}</div>
-    </div>`;
-  document.body.appendChild(intro);
-  
-  // Trigger animation
-  requestAnimationFrame(()=>intro.classList.add('playing'));
-  
-  // Exit after 3.5s
-  setTimeout(()=>{
-    intro.classList.add('exiting');
-    setTimeout(()=>{
-      intro.remove();
-      rRoadmapContent(el);
-    },500);
-  },3500);
-}
-
-function rRoadmapContent(el){
-  const progress=getRoadmapProgress();
-  
-  // Calculate completion
-  let totalChecks=0,doneChecks=0;
-  ROADMAP_STEPS.forEach(step=>{
-    step.checklist.forEach((item,i)=>{
-      totalChecks++;
-      if(progress[step.id]&&progress[step.id][i])doneChecks++;
-    });
-  });
-  const pct=totalChecks?(doneChecks/totalChecks*100):0;
-  
-  // Find current step (first incomplete)
-  let currentStep=11;
-  for(const step of ROADMAP_STEPS){
-    const stepDone=step.checklist.every((_,i)=>progress[step.id]&&progress[step.id][i]);
-    if(!stepDone){currentStep=step.id;break}
-  }
-  
-  // Line fill height
-  const completedSteps=ROADMAP_STEPS.filter(s=>s.checklist.every((_,i)=>progress[s.id]&&progress[s.id][i])).length;
-  const linePct=ROADMAP_STEPS.length>1?(completedSteps/(ROADMAP_STEPS.length-1)*100):0;
-  
-  let h=`<div class="roadmap fade-up">
-    <div class="roadmap-header">
-      <h2>🗺️ Your SOA Journey</h2>
-      <p>Follow the path from beginner to consistent, profitable trader</p>
-      <div class="roadmap-progress">
-        <div class="roadmap-progress-bar"><div class="roadmap-progress-fill" style="width:${pct}%"></div></div>
-        <span class="roadmap-progress-text">${pct.toFixed(0)}% Complete</span>
-      </div>
-    </div>
-    <div style="position:relative">
-      <div class="roadmap-line"><div class="roadmap-line-fill" style="height:${linePct}%"></div></div>`;
-  
-  ROADMAP_STEPS.forEach((step,idx)=>{
-    const stepProgress=progress[step.id]||{};
-    const checkedCount=step.checklist.filter((_,i)=>stepProgress[i]).length;
-    const isDone=checkedCount===step.checklist.length;
-    const isCurrent=step.id===currentStep;
-    const isExpanded=expandedStep===step.id;
-    const nodeClass=isDone?'rm-node-done':isCurrent?'rm-node-current':'rm-node-locked';
-    const cardClass=isDone?'done':isCurrent?'current':'';
-    const statusText=isDone?'<span style="color:#22c55e">✓ Complete</span>':isCurrent?'<span style="color:#22c55e">● In Progress</span>':`<span style="color:var(--text-muted)">○ Locked</span>`;
-    
-    h+=`<div class="rm-step fade-up stagger-${Math.min(idx+1,8)}">
-      <div class="rm-node ${nodeClass}" onclick="toggleRoadmapStep(${step.id})">${isDone?'✓':step.id}</div>
-      <div class="rm-card ${cardClass}" onclick="toggleRoadmapStep(${step.id})">
-        <div class="rm-card-top">
-          <span class="rm-card-phase rm-phase-${step.phaseClass}">${step.phase}</span>
-          <span class="rm-card-status">${statusText} · ${checkedCount}/${step.checklist.length}</span>
-        </div>
-        <div class="rm-card-title">Step ${step.id}: ${step.title}</div>
-        <div class="rm-card-desc">${step.desc}</div>`;
-    
-    if(isExpanded){
-      h+=`<div class="rm-card-expanded">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Checklist</div>
-        <div class="rm-card-checklist">`;
-      step.checklist.forEach((item,i)=>{
-        const checked=stepProgress[i];
-        h+=`<div class="rm-check-item${checked?' checked':''}" onclick="event.stopPropagation();toggleRoadmapCheck(${step.id},${i})">
-          <div class="rm-check-icon">${checked?'✓':''}</div>
-          <span>${item}</span>
-        </div>`;
-      });
-      h+=`</div></div>`;
-    }
-    
-    h+=`</div></div>`;
-  });
-  
-  h+=`</div></div>`;
-  el.innerHTML=h;
-}
-
-function toggleRoadmapStep(id){
-  expandedStep=expandedStep===id?null:id;
-  ren();
-}
-
-function toggleRoadmapCheck(stepId,checkIdx){
-  const progress=getRoadmapProgress();
-  if(!progress[stepId])progress[stepId]={};
-  progress[stepId][checkIdx]=!progress[stepId][checkIdx];
-  saveRoadmapProgress(progress);
-  ren();
-}
-
 // ═══ DAILY JOURNAL ═══
 const DJ_EMOTIONS=['Calm','Confident','Focused','Patient','Satisfied','Excited','Anxious','Frustrated','Impatient','Overwhelmed','Distracted','Disappointed'];
 const DJ_BIASES=['Overtrading','Revenge Trading','FOMO','Impatience','Hesitation','Greed','Fear','Loss Aversion','Confirmation Bias','Anchoring Bias','Recency Bias','Sunk Cost Fallacy'];
@@ -2467,13 +2157,14 @@ function rJournal(el){
   // Trade rows
   const tradeRows=dayTrades.map(t=>{
     const time=t.date||'';
+    const ssHtml=(t.screenshots&&t.screenshots.length)?`<tr><td colspan="5" style="padding:4px 8px"><div class="trade-screenshots">${t.screenshots.map(img=>`<img src="${img}" onclick="openScreenshot(this.src)" alt="Trade screenshot">`).join('')}</div></td></tr>`:'';
     return`<tr>
       <td style="font-weight:700;color:var(--text-primary)">${esc(t.ticker)}</td>
       <td><span style="color:${t.direction==='Long'?'var(--green)':'var(--red)'};font-weight:700;font-size:11px;background:${t.direction==='Long'?'rgba(34,197,94,0.1)':'rgba(239,68,68,0.1)'};padding:3px 10px;border-radius:4px">${t.direction.toUpperCase()}</span></td>
       <td>${t.quantity||1}</td>
       <td style="color:var(--text-muted)">${esc(t.strategy||'—')}</td>
       <td style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'};font-weight:800">${f$(t.pnl)}</td>
-    </tr>`;
+    </tr>${ssHtml}`;
   }).join('');
   
   // Star rating
@@ -2523,7 +2214,7 @@ function rJournal(el){
     
     ${dayTrades.length?`<div class="dj-section">
       <div class="dj-section-title">🤖 AI Daily Analysis</div>
-      <div class="dj-ai">${aiAnalysis}</div>
+      <div class="dj-ai" id="ai-analysis-${journalDate}">${_aiCache[journalDate]||aiAnalysis}</div>
     </div>`:''}
     
     <div class="dj-section">
@@ -2555,6 +2246,7 @@ function rJournal(el){
       <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">✓ Auto-saved</span>
     </div>
   </div>`;
+  if(dayTrades.length)setTimeout(()=>fetchLLMAnalysis(journalDate,dayTrades,dj),100);
 }
 
 function setDJField(date,field,val){const dj=getDJ(date);dj[field]=val;saveDJ(date,dj);checkJournalCompletion(date);ren()}
@@ -2638,8 +2330,29 @@ function generateDailyAI(dayTrades,dj){
   }else{
     h+=`Red day with poor compliance. This is where accounts get blown up. Before tomorrow, re-read your SOA rules, set your max loss, and commit to following the system. No trade is better than a bad trade.`;
   }
-  
+
   return h;
+}
+
+const _aiCache={};
+function fetchLLMAnalysis(date,dayTrades,dj){
+  const cacheKey=date;
+  if(_aiCache[cacheKey])return;
+  const el=document.getElementById('ai-analysis-'+date);
+  if(!el)return;
+  const recentHistory=[];
+  const dates=[...new Set(trades.map(t=>dKey(t.date)))].sort().reverse().filter(d=>d!==date).slice(0,7);
+  dates.forEach(d=>{
+    const dt=trades.filter(t=>dKey(t.date)===d);
+    if(!dt.length)return;
+    const w=dt.filter(t=>t.pnl>0).length;
+    const rules=dt.reduce((s,t)=>s+(t.rulesFollowed||[]).length,0);
+    recentHistory.push({date:d,tradeCount:dt.length,pnl:dt.reduce((s,t)=>s+(t.pnl||0),0),winRate:dt.length?(w/dt.length*100):0,avgEmotion:dt.reduce((s,t)=>s+(t.emotionRating||5),0)/dt.length,compliance:dt.length?(rules/(dt.length*RL.length)*100):0});
+  });
+  el.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px 0"><div class="ai-loading-spinner"></div><span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">Generating personalized analysis...</span></div>'+el.innerHTML;
+  api('POST','/api/ai/journal-analysis',{date,dayTrades:dayTrades.map(t=>({ticker:t.ticker,direction:t.direction,pnl:t.pnl,strategy:t.strategy,emotionRating:t.emotionRating,rulesFollowed:t.rulesFollowed,notes:t.notes})),journal:dj||{},recentHistory,riskPlan:_cachedRiskPlan||{}}).then(data=>{
+    if(data.analysis){_aiCache[cacheKey]=data.analysis;const el2=document.getElementById('ai-analysis-'+date);if(el2)el2.innerHTML=data.analysis}
+  }).catch(err=>{console.error('LLM analysis error:',err);const el2=document.getElementById('ai-analysis-'+date);if(el2){const spinner=el2.querySelector('.ai-loading-spinner');if(spinner)spinner.parentElement.remove()}});
 }
 
 // ═══ RISK PLAN ═══
@@ -3443,7 +3156,7 @@ function handleImportFile(file){if(!file)return;const status=document.getElement
         return;
       }
       
-      if(!hasBS&&!hasContract){status.innerHTML='<div class="import-status error">Could not detect broker format. Make sure you selected the right broker and exported the correct file.</div>';return}const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length){status.innerHTML='<div class="import-status error">No filled orders found.</div>';return}filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({date:date.split(' ')[0]||date.split('T')[0]||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});if(!rts.length){status.innerHTML='<div class="import-status error">Could not match round-trip trades.</div>';return}pendingImports=rts;const totalPnl=rts.reduce((s,t)=>s+t.pnl,0);const totalFees=rts.reduce((s,t)=>s+(t.fees||0),0);const totalGross=rts.reduce((s,t)=>s+(t.grossPnl||0),0);let table=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length>1?'s':''} found</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)"><table class="import-preview-table"><thead><tr><th>Date</th><th>Product</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Fees</th><th>Net P&L</th></tr></thead><tbody>`;rts.slice(0,30).forEach(t=>{table+=`<tr><td>${t.date}</td><td>${t.product}</td><td style="color:${t.direction==='Long'?'var(--green)':'var(--red)'}">${t.direction==='Long'?'▲':'▼'}</td><td>${t.entryPrice}</td><td>${t.exitPrice}</td><td style="color:${(t.grossPnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.grossPnl||0)}</td><td style="color:var(--red)">${f$(t.fees||0)}</td><td style="color:${t.pnl>=0?'var(--green)':'var(--red)'}; font-weight:700">${f$(t.pnl)}</td></tr>`});if(rts.length>30)table+=`<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">+${rts.length-30} more</td></tr>`;table+='</tbody></table></div></div>';document.getElementById('importPreview').innerHTML=table;status.innerHTML=`<div class="import-status success">✓ ${rts.length} trades ready — click Review to tag each one</div>`;document.getElementById('btnImportConfirm').style.display='inline-block'}catch(err){console.error(err);status.innerHTML=`<div class="import-status error">Error: ${err.message}</div>`}};reader.readAsText(file)}
+      if(!hasBS&&!hasContract){status.innerHTML='<div class="import-status error">Could not detect broker format. Make sure you selected the right broker and exported the correct file.</div>';return}const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length){status.innerHTML='<div class="import-status error">No filled orders found.</div>';return}filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({date:normalizeDate(date.split(' ')[0]||date.split('T')[0])||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});if(!rts.length){status.innerHTML='<div class="import-status error">Could not match round-trip trades.</div>';return}pendingImports=rts;const totalPnl=rts.reduce((s,t)=>s+t.pnl,0);const totalFees=rts.reduce((s,t)=>s+(t.fees||0),0);const totalGross=rts.reduce((s,t)=>s+(t.grossPnl||0),0);let table=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length>1?'s':''} found</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)"><table class="import-preview-table"><thead><tr><th>Date</th><th>Product</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Fees</th><th>Net P&L</th></tr></thead><tbody>`;rts.slice(0,30).forEach(t=>{table+=`<tr><td>${t.date}</td><td>${t.product}</td><td style="color:${t.direction==='Long'?'var(--green)':'var(--red)'}">${t.direction==='Long'?'▲':'▼'}</td><td>${t.entryPrice}</td><td>${t.exitPrice}</td><td style="color:${(t.grossPnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.grossPnl||0)}</td><td style="color:var(--red)">${f$(t.fees||0)}</td><td style="color:${t.pnl>=0?'var(--green)':'var(--red)'}; font-weight:700">${f$(t.pnl)}</td></tr>`});if(rts.length>30)table+=`<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">+${rts.length-30} more</td></tr>`;table+='</tbody></table></div></div>';document.getElementById('importPreview').innerHTML=table;status.innerHTML=`<div class="import-status success">✓ ${rts.length} trades ready — click Review to tag each one</div>`;document.getElementById('btnImportConfirm').style.display='inline-block'}catch(err){console.error(err);status.innerHTML=`<div class="import-status error">Error: ${err.message}</div>`}};reader.readAsText(file)}
 
 // ─── REVIEW SLIDESHOW ───
 function startReview(){if(!pendingImports.length)return;
@@ -3462,8 +3175,8 @@ body.innerHTML=`<div class="review-slide"><div class="review-progress"><span cla
 <div class="review-field"><label>Rules followed</label><div class="rules-grid">${RL.map((r,i)=>`<div class="rule-item${(t.rulesFollowed||[]).includes(r)?' checked':''}" onclick="toggleRevRule(${reviewIndex},${i},this)"><span class="rule-check">${(t.rulesFollowed||[]).includes(r)?'✓':''}</span><span class="rule-text">${r}</span></div>`).join('')}</div></div>
 <div class="review-field review-notes"><label>Notes (optional)</label><textarea id="rv-notes" placeholder="What happened on this trade?" oninput="reviewData[${reviewIndex}].notes=this.value">${t.notes||''}</textarea></div>
 <div class="review-field"><label>Chart Screenshot (optional)</label>
-<div class="screenshot-upload" onclick="document.getElementById('rv-screenshot').click()">
-<div class="screenshot-upload-text">Click to attach a chart screenshot</div>
+<div class="screenshot-upload" onclick="document.getElementById('rv-screenshot').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault();event.stopPropagation();this.classList.remove('dragover');if(event.dataTransfer.files.length)handleReviewScreenshot(${reviewIndex},event.dataTransfer.files[0])">
+<div class="screenshot-upload-text">Click or drag & drop a chart screenshot</div>
 <input type="file" id="rv-screenshot" accept="image/*" style="display:none" onchange="handleReviewScreenshot(${reviewIndex},this)">
 </div>
 <div class="screenshot-preview" id="rv-screenshot-preview">${(t.screenshots||[]).map((img,si)=>`<div class="screenshot-thumb"><img src="${img}"><button class="screenshot-remove" onclick="event.stopPropagation();removeReviewScreenshot(${reviewIndex},${si})">✕</button></div>`).join('')}</div>
@@ -3475,18 +3188,25 @@ function updateEmoPreview(val,idx){val=parseInt(val);reviewData[idx].emotionRati
 function toggleRevRule(tradeIdx,ruleIdx,el){const r=RL[ruleIdx];const rules=reviewData[tradeIdx].rulesFollowed||[];if(rules.includes(r)){reviewData[tradeIdx].rulesFollowed=rules.filter(x=>x!==r);el.classList.remove('checked');el.querySelector('.rule-check').textContent=''}else{rules.push(r);reviewData[tradeIdx].rulesFollowed=rules;el.classList.add('checked');el.querySelector('.rule-check').textContent='✓'}}
 
 function compressImage(file,maxW,quality){
-  return new Promise((resolve)=>{
+  const MAX_FILE_SIZE=15*1024*1024;
+  if(file.size>MAX_FILE_SIZE)return Promise.reject(new Error('File is too large (max 15MB). Please use a smaller image.'));
+  if(!file.type.startsWith('image/'))return Promise.reject(new Error('Only image files are supported.'));
+  return new Promise((resolve,reject)=>{
     const reader=new FileReader();
+    reader.onerror=function(){reject(new Error('Failed to read file'))};
     reader.onload=function(e){
       const img=new Image();
+      img.onerror=function(){reject(new Error('Failed to load image — file may be corrupted'))};
       img.onload=function(){
-        const canvas=document.createElement('canvas');
-        let w=img.width,h=img.height;
-        if(w>maxW){h=h*(maxW/w);w=maxW}
-        canvas.width=w;canvas.height=h;
-        const ctx=canvas.getContext('2d');
-        ctx.drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',quality));
+        try{
+          const canvas=document.createElement('canvas');
+          let w=img.width,h=img.height;
+          if(w>maxW){h=h*(maxW/w);w=maxW}
+          canvas.width=w;canvas.height=h;
+          const ctx=canvas.getContext('2d');
+          ctx.drawImage(img,0,0,w,h);
+          resolve(canvas.toDataURL('image/jpeg',quality));
+        }catch(err){reject(new Error('Failed to compress image'))}
       };
       img.src=e.target.result;
     };
@@ -3495,17 +3215,17 @@ function compressImage(file,maxW,quality){
 }
 
 function handleReviewScreenshot(tradeIdx,input){
-  const file=input.files[0];
+  const file=input.files?input.files[0]:input;
   if(!file)return;
+  if(!reviewData[tradeIdx].screenshots)reviewData[tradeIdx].screenshots=[];
+  if(reviewData[tradeIdx].screenshots.length>=3){alert('Max 3 screenshots per trade');return}
   compressImage(file,600,0.5).then(dataUrl=>{
-    if(!reviewData[tradeIdx].screenshots)reviewData[tradeIdx].screenshots=[];
-    if(reviewData[tradeIdx].screenshots.length>=3){alert('Max 3 screenshots per trade');return}
     reviewData[tradeIdx].screenshots.push(dataUrl);
     const preview=document.getElementById('rv-screenshot-preview');
     const idx=reviewData[tradeIdx].screenshots.length-1;
     preview.innerHTML+=`<div class="screenshot-thumb"><img src="${dataUrl}"><button class="screenshot-remove" onclick="event.stopPropagation();removeReviewScreenshot(${tradeIdx},${idx})">✕</button></div>`;
-    input.value='';
-  });
+    if(input.value)input.value='';
+  }).catch(err=>{alert(err.message);if(input.value)input.value=''});
 }
 
 function removeReviewScreenshot(tradeIdx,imgIdx){
@@ -3516,10 +3236,10 @@ function removeReviewScreenshot(tradeIdx,imgIdx){
 function checkStorageUsage(){return 0;}
 
 function saveCurrentReview(){const t=reviewData[reviewIndex];const emo=document.getElementById('rv-emo');if(emo)t.emotionRating=parseInt(emo.value);const notes=document.getElementById('rv-notes');if(notes)t.notes=notes.value}
-function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
+function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:normalizeDate(rt.date)||rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
 
 // ─── TRADE MODAL ───
-function openModal(tr){editId=tr?tr.id:null;document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';rSOA();switchModalTab('trade');document.getElementById('tradeModal').classList.add('active')}
+function openModal(tr){editId=tr?tr.id:null;document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';const ssField=document.getElementById('modal-screenshots-field');const ssCont=document.getElementById('modal-screenshots');if(tr&&tr.screenshots&&tr.screenshots.length){ssField.style.display='block';ssCont.innerHTML=tr.screenshots.map(img=>`<img src="${img}" onclick="openScreenshot(this.src)" alt="Trade screenshot">`).join('')}else{ssField.style.display='none';ssCont.innerHTML=''}rSOA();switchModalTab('trade');document.getElementById('tradeModal').classList.add('active')}
 function closeModal(){document.getElementById('tradeModal').classList.remove('active');editId=null}
 function switchModalTab(t){document.querySelectorAll('.modal-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));['trade','soa','notes'].forEach(id=>{document.getElementById('tab-'+id).style.display=id===t?(id==='trade'?'grid':'block'):'none'})}
 function updateTickers(){const s=document.getElementById('f-ticker'),t=document.getElementById('f-instrument').value==='options'?OT:FT;s.innerHTML=t.map(x=>`<option value="${x}">${x}</option>`).join('')}
@@ -3534,10 +3254,15 @@ function tgRule(i){const r=RL[i];if(fRules.includes(r))fRules=fRules.filter(x=>x
 function saveTrade(){const t={id:editId||gId(),date:document.getElementById('f-date').value,instrument:document.getElementById('f-instrument').value,ticker:document.getElementById('f-ticker').value,direction:fDir,entryPrice:document.getElementById('f-entry').value,exitPrice:document.getElementById('f-exit').value,quantity:document.getElementById('f-qty').value,stopLoss:document.getElementById('f-sl').value,pnl:Number(document.getElementById('f-pnl').value)||0,fees:Number(document.getElementById('f-fees').value)||0,strategy:fSetup.join(' + ')||'No Strategy Used',emotionRating:fEmoRating,rulesFollowed:[...fRules],notes:document.getElementById('f-notes').value};if(editId)trades=trades.map(x=>x.id===editId?{...t,totw:x.totw}:x);else trades.push(t);svTr(t);chkBdg();chkMilestones();closeModal();ren()}
 function editTr(id){const t=trades.find(x=>x.id===id);if(t)openModal(t)}
 function delTr(id){if(!confirm('Delete this trade?'))return;trades=trades.filter(t=>t.id!==id);api('DELETE','/api/trades/'+id).catch(err=>console.error(err));ren()}
+function openScreenshot(src){const ov=document.createElement('div');ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px';ov.onclick=()=>ov.remove();ov.innerHTML=`<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">`;document.body.appendChild(ov)}
 
 (function(){const savedToken=localStorage.getItem('soa_token');if(savedToken){authToken=savedToken;api('GET','/api/auth/me').then(data=>{loginAs(data.user.username,data.user.is_mentor)}).catch(()=>{localStorage.removeItem('soa_token');authToken=null;document.getElementById('loginScreen').style.display='flex';updateTickers()})}else{document.getElementById('loginScreen').style.display='flex';updateTickers()}})();
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin()});
 document.getElementById('regConfirm').addEventListener('keydown',e=>{if(e.key==='Enter')handleRegister()});
+
+// Prevent accidental file drops from navigating away from the page
+document.addEventListener('dragover',function(e){e.preventDefault()});
+document.addEventListener('drop',function(e){e.preventDefault()});
 
 // ═══ ANIMATED BACKGROUND ═══
 (function initBg(){

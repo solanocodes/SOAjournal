@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const { pool, initDB } = require('./db');
 const { generateToken, authMiddleware, mentorOnly } = require('./auth');
+const Anthropic = require('@anthropic-ai/sdk').default;
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -290,38 +291,6 @@ app.post('/api/milestones/:milestoneId', authMiddleware, async (req, res) => {
 });
 
 // ═══════════════════════════════════
-// ROADMAP ROUTES
-// ═══════════════════════════════════
-
-app.get('/api/roadmap', authMiddleware, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT step_index, item_index FROM roadmap_progress WHERE user_id = $1',
-      [req.user.id]
-    );
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-app.post('/api/roadmap', authMiddleware, async (req, res) => {
-  try {
-    const { stepIndex, itemIndex, completed } = req.body;
-    if (completed) {
-      await pool.query(
-        'INSERT INTO roadmap_progress (user_id, step_index, item_index) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
-        [req.user.id, stepIndex, itemIndex]
-      );
-    } else {
-      await pool.query(
-        'DELETE FROM roadmap_progress WHERE user_id=$1 AND step_index=$2 AND item_index=$3',
-        [req.user.id, stepIndex, itemIndex]
-      );
-    }
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-// ═══════════════════════════════════
 // RISK PLAN ROUTES
 // ═══════════════════════════════════
 
@@ -419,13 +388,12 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
 app.get('/api/mentor/student/:id', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const userId = req.params.id;
-    const [user, trades, journals, badges, milestones, roadmap, riskplan] = await Promise.all([
+    const [user, trades, journals, badges, milestones, riskplan] = await Promise.all([
       pool.query('SELECT id, username, created_at FROM users WHERE id = $1', [userId]),
       pool.query('SELECT * FROM trades WHERE user_id = $1 ORDER BY date DESC', [userId]),
       pool.query('SELECT * FROM daily_journals WHERE user_id = $1', [userId]),
       pool.query('SELECT badge_id, earned_at FROM badges WHERE user_id = $1', [userId]),
       pool.query('SELECT milestone_id, earned_at FROM milestones WHERE user_id = $1', [userId]),
-      pool.query('SELECT step_index, item_index FROM roadmap_progress WHERE user_id = $1', [userId]),
       pool.query('SELECT * FROM risk_plans WHERE user_id = $1', [userId])
     ]);
 
@@ -448,7 +416,6 @@ app.get('/api/mentor/student/:id', authMiddleware, mentorOnly, async (req, res) 
       journals: journalMap,
       badges: badgeMap,
       milestones: milestoneMap,
-      roadmap: roadmap.rows,
       riskplan: riskplan.rows[0] || {}
     });
   } catch (err) {
@@ -476,6 +443,89 @@ app.get('/api/mentor/notes/:studentId', authMiddleware, mentorOnly, async (req, 
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ═══════════════════════════════════
+// AI JOURNAL ANALYSIS
+// ═══════════════════════════════════
+
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
+
+const AI_SYSTEM_PROMPT = `You are an expert trading coach for the SOA (Solano Options Academy) trading system. You analyze a student's daily trading journal and provide direct, specific, actionable feedback.
+
+The SOA system uses these strategies: SOA Levels, Fibonacci Golden Pocket, TFC (Trend Following Candle), and Orderblocks.
+
+The 8 SOA trading rules are:
+1. Followed max loss per trade
+2. Followed max loss per day
+3. Waited for confirmation candle
+4. Traded at key level / liquidity zone
+5. Proper position sizing
+6. Did not resize mid-trade
+7. Stopped at trade limit
+8. Followed stop loss plan
+
+Your coaching style:
+- Be direct and specific — reference exact trades, numbers, and patterns
+- Connect dots between emotion ratings, rule breaks, and P&L outcomes
+- Compare today to recent history when patterns emerge
+- If they had a pre-market plan, compare it to what actually happened
+- One concrete recommendation for tomorrow, not five generic tips
+- Speak like a mentor who reviewed their specific trades, not a template
+- Use HTML formatting: <h4> for section headers, <strong> for emphasis, bullet points with •
+- Keep it under 500 words — dense and useful, not padded`;
+
+app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
+  if (!anthropic) return res.status(503).json({ error: 'AI analysis not available' });
+
+  try {
+    const { dayTrades, journal, recentHistory, riskPlan, date } = req.body;
+    if (!dayTrades || !dayTrades.length) return res.status(400).json({ error: 'No trades to analyze' });
+
+    let prompt = `Analyze this trader's day for ${date}:\n\n`;
+    prompt += `**Today's Trades:**\n`;
+    dayTrades.forEach((t, i) => {
+      prompt += `${i + 1}. ${t.ticker} ${t.direction} | Strategy: ${t.strategy || 'None'} | P&L: $${t.pnl} | Emotion: ${t.emotionRating}/10 | Rules followed: ${(t.rulesFollowed || []).join(', ') || 'none tagged'}${t.notes ? ' | Notes: ' + t.notes : ''}\n`;
+    });
+
+    const tp = dayTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const wins = dayTrades.filter(t => t.pnl > 0).length;
+    prompt += `\nDay total: $${tp.toFixed(2)} | ${wins}W/${dayTrades.length - wins}L | ${dayTrades.length} trades\n`;
+
+    if (riskPlan && riskPlan.maxLossPerTrade) {
+      prompt += `\n**Risk Plan:** Account: $${riskPlan.accountSize || '?'} | Max loss/trade: $${riskPlan.maxLossPerTrade} | Max loss/day: $${riskPlan.maxLossPerDay} | Max trades/day: ${riskPlan.maxTradesPerDay || '?'}\n`;
+    }
+
+    if (journal) {
+      if (journal.pmBias || journal.pmGoals || journal.pmLevels) {
+        prompt += `\n**Pre-Market Plan:** Bias: ${journal.pmBias || 'not set'} | Goals: ${journal.pmGoals || 'not set'} | Key levels: ${journal.pmLevels || 'not set'} | Rules committed: ${(journal.pmRules || []).join(', ') || 'none'}\n`;
+      }
+      if (journal.emotions && journal.emotions.length) prompt += `Post-trading emotions: ${journal.emotions.join(', ')}\n`;
+      if (journal.biases && journal.biases.length) prompt += `Biases experienced: ${journal.biases.join(', ')}\n`;
+    }
+
+    if (recentHistory && recentHistory.length) {
+      prompt += `\n**Last 7 trading days:**\n`;
+      recentHistory.forEach(d => {
+        prompt += `${d.date}: ${d.tradeCount} trades, $${d.pnl.toFixed(2)}, ${d.winRate.toFixed(0)}% WR, ${d.avgEmotion.toFixed(1)} emo, ${d.compliance.toFixed(0)}% rules\n`;
+      });
+    }
+
+    prompt += `\nGive your analysis in HTML format with <h4> section headers. Be specific to THIS trader's data.`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 800,
+      system: AI_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const analysis = message.content[0]?.text || '';
+    res.json({ analysis });
+  } catch (err) {
+    console.error('AI analysis error:', err);
+    res.status(500).json({ error: 'AI analysis failed' });
+  }
 });
 
 // ═══════════════════════════════════
