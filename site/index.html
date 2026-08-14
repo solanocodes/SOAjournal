@@ -292,6 +292,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-bubble{max-width:82%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;color:var(--text-secondary);background:var(--bg-deep);border:1px solid var(--bg-elevated)}
 .coach-msg.me .coach-bubble{background:var(--bg-elevated);color:var(--text-primary);border-color:var(--border)}
 .coach-bubble strong{color:var(--text-primary)}
+.coach-msg-img{max-width:240px;max-height:170px;border-radius:8px;display:block;margin-top:8px;border:1px solid var(--border);cursor:pointer;object-fit:cover}
+.coach-att-note{font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic}
 .coach-chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 10px}
 .coach-chip{background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);font-size:12px;padding:6px 12px;cursor:pointer;transition:all .15s}
 .coach-chip:hover{border-color:var(--accent);color:var(--text-primary)}
@@ -1298,7 +1300,12 @@ function renderCoach(){
   if(!_coachHist.length){
     m.innerHTML=`<div class="coach-msg ai"><div class="coach-bubble">I'm **Delta** — your SOA trading coach. I can see every trade you've logged, your risk plan, and your journal.<br><br>Send anything to get started. If we haven't talked before, I'll ask a few quick questions so I know exactly what to help you with — your account, your entry model, your goals, and what to hold you accountable for.</div></div>`;
   }else{
-    m.innerHTML=_coachHist.map(x=>`<div class="coach-msg ${x.role==='user'?'me':'ai'}"><div class="coach-bubble">${coachMdEsc(x.content)}</div></div>`).join('');
+    m.innerHTML=_coachHist.map(x=>{
+      let inner=coachMdEsc(x.content);
+      if(x.img)inner+=`<img class="coach-msg-img" src="${x.img}" onclick="openScreenshot(this.src)">`;
+      else if(x.has_image&&x.role==='user')inner+='<div class="coach-att-note">chart attached</div>';
+      return`<div class="coach-msg ${x.role==='user'?'me':'ai'}"><div class="coach-bubble">${inner}</div></div>`;
+    }).join('');
   }
   renderCoachChips();
   m.scrollTop=m.scrollHeight;
@@ -1371,7 +1378,7 @@ function sendCoach(){
   const doc=_coachDoc;_coachDoc=null;
   const prev=document.getElementById('coachImgPrev');if(prev)prev.innerHTML='';
   if(inp)inp.value='';
-  _coachHist.push({role:'user',content:(text||(doc?'Document upload':'[chart screenshot] attached'))+(doc?' [document attached: '+doc.name+']':''),has_image:!!img});
+  _coachHist.push({role:'user',content:(text||(doc?'Document upload':'Analyze this chart.'))+(doc?' [document attached: '+doc.name+']':''),has_image:!!img,img:img||null});
   const m=document.getElementById('coachMsgs');
   if(m){renderCoach();m.insertAdjacentHTML('beforeend','<div class="coach-msg ai" id="coachTyping"><div class="coach-bubble"><span class="coach-dots"><i></i><i></i><i></i></span></div></div>');m.scrollTop=m.scrollHeight}
   _coachBusy=true;const btn=document.getElementById('coachSendBtn');if(btn)btn.disabled=true;
