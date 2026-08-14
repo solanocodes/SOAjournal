@@ -3255,6 +3255,21 @@ document.getElementById('regConfirm').addEventListener('keydown',e=>{if(e.key===
 document.addEventListener('dragover',function(e){e.preventDefault()});
 document.addEventListener('drop',function(e){e.preventDefault()});
 
+// Paste images from clipboard: routes to the import review screen or the coach chat
+document.addEventListener('paste',function(e){
+  const items=e.clipboardData&&e.clipboardData.items;if(!items)return;
+  let f=null;
+  for(const it of items){if(it.type&&it.type.indexOf('image/')===0){f=it.getAsFile();break}}
+  if(!f)return;
+  const im=document.getElementById('importModal');
+  if(im&&im.classList.contains('active')&&document.getElementById('rv-screenshot-preview')){
+    e.preventDefault();handleReviewScreenshot(reviewIndex,f);return;
+  }
+  if(typeof curView!=='undefined'&&curView==='coach'&&typeof coachSetFile==='function'){
+    e.preventDefault();coachSetFile(f);
+  }
+});
+
 // ═══ ANIMATED BACKGROUND ═══
 (function initBg(){
   const canvas=document.getElementById('bgCanvas');
