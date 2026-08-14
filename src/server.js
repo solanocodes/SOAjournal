@@ -259,7 +259,7 @@ app.get('/api/badges', authMiddleware, async (req, res) => {
     const badges = {};
     result.rows.forEach(r => { badges[r.badge_id] = r.earned_at; });
     res.json(badges);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/badges/:badgeId', authMiddleware, async (req, res) => {
@@ -269,7 +269,7 @@ app.post('/api/badges/:badgeId', authMiddleware, async (req, res) => {
       [req.user.id, req.params.badgeId]
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.get('/api/milestones', authMiddleware, async (req, res) => {
@@ -278,7 +278,7 @@ app.get('/api/milestones', authMiddleware, async (req, res) => {
     const milestones = {};
     result.rows.forEach(r => { milestones[r.milestone_id] = r.earned_at; });
     res.json(milestones);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/milestones/:milestoneId', authMiddleware, async (req, res) => {
@@ -288,7 +288,7 @@ app.post('/api/milestones/:milestoneId', authMiddleware, async (req, res) => {
       [req.user.id, req.params.milestoneId]
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
@@ -306,7 +306,7 @@ app.get('/api/riskplan', authMiddleware, async (req, res) => {
       maxLossPerWeek: parseFloat(r.max_loss_per_week), maxDrawdown: parseFloat(r.max_drawdown),
       maxTradesPerDay: r.max_trades_per_day, personalRules: r.personal_rules
     });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/riskplan', authMiddleware, async (req, res) => {
@@ -325,7 +325,7 @@ app.post('/api/riskplan', authMiddleware, async (req, res) => {
        rp.maxTradesPerDay||3, rp.personalRules||'']
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
@@ -338,7 +338,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
     if (!result.rows.length) return res.json({ customFees: {}, walkthroughDone: false, journalCompletions: {} });
     const s = result.rows[0];
     res.json({ customFees: s.custom_fees||{}, walkthroughDone: s.walkthrough_done, journalCompletions: s.journal_completions||{} });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/settings', authMiddleware, async (req, res) => {
@@ -353,7 +353,7 @@ app.post('/api/settings', authMiddleware, async (req, res) => {
       [req.user.id, JSON.stringify(s.customFees||{}), s.walkthroughDone||false, JSON.stringify(s.journalCompletions||{})]
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
@@ -485,7 +485,7 @@ app.post('/api/mentor/note', authMiddleware, mentorOnly, async (req, res) => {
       [req.user.id, studentId, date, note]
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.get('/api/mentor/notes/:studentId', authMiddleware, mentorOnly, async (req, res) => {
@@ -495,7 +495,7 @@ app.get('/api/mentor/notes/:studentId', authMiddleware, mentorOnly, async (req, 
       [req.params.studentId]
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
@@ -767,7 +767,7 @@ app.get('/api/coach/history', authMiddleware, async (req, res) => {
       "SELECT COUNT(*)::int AS c FROM coach_memory WHERE user_id = $1 AND status = 'active'", [req.user.id]
     )).rows[0].c;
     res.json({ messages: msgs, memoryCount: mem });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/coach/chat', authMiddleware, async (req, res) => {
@@ -893,14 +893,14 @@ app.get('/api/coach/memory', authMiddleware, async (req, res) => {
       "SELECT id, kind, content, created_at FROM coach_memory WHERE user_id = $1 AND status = 'active' ORDER BY kind, id DESC LIMIT 100", [req.user.id]
     )).rows;
     res.json(rows);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.delete('/api/coach/memory/:id', authMiddleware, async (req, res) => {
   try {
     await pool.query("UPDATE coach_memory SET status = 'deleted' WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
@@ -934,7 +934,7 @@ app.get('/api/accounts', authMiddleware, async (req, res) => {
   try {
     const rows = (await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY id', [req.user.id])).rows;
     res.json(rows.map(acctRow));
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/accounts', authMiddleware, async (req, res) => {
@@ -970,7 +970,7 @@ app.delete('/api/accounts/:id', authMiddleware, async (req, res) => {
     await pool.query('UPDATE trades SET account_id = NULL WHERE account_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     await pool.query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ---- Tradovate sync ----
@@ -1159,7 +1159,7 @@ app.post('/api/mentor/rollcall', authMiddleware, mentorOnly, async (req, res) =>
     const out = await postRollCall();
     if (out.error) return res.status(400).json(out);
     res.json(out);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ═══════════════════════════════════
