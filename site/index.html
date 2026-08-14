@@ -270,6 +270,19 @@ input,select,textarea,button{font-family:inherit;outline:none}
 
 
 
+/* ═══ ACCOUNTS ═══ */
+.acct-switch{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:12.5px;padding:6px 10px;max-width:190px}
+.acct-card{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px}
+.payout-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px}
+.payout-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
+.payout-card.ok{border-color:rgba(111,176,131,.45)}
+.payout-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.payout-name{font-size:13px;font-weight:650}
+.payout-status{font-size:10px;font-weight:700;letter-spacing:.08em}
+.payout-net{font-size:24px;font-weight:650;letter-spacing:-.01em}
+.payout-sub{font-size:11px;color:var(--text-muted);margin:2px 0 10px}
+.payout-check{font-size:12px;color:var(--text-secondary);padding:3px 0}
+
 /* ═══ AI COACH CHAT ═══ */
 .coach{display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;max-width:860px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden}
 .coach-msgs{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
@@ -762,7 +775,10 @@ input,select,textarea,button{font-family:inherit;outline:none}
   </aside>
   <div class="maincol">
     <header class="header">
-      <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      <div style="display:flex;align-items:center;gap:12px">
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <select id="acctSwitch" class="acct-switch" onchange="setAccount(this.value)" style="display:none"></select>
+      </div>
       <div class="header-right">
         <button class="btn-mentor-report" onclick="generateMentorPDF()">Send to Mentor</button>
         <button class="btn-import" onclick="openImport()">Import</button>
@@ -868,15 +884,21 @@ async function api(method,path,body){
   return data;
 }
 let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRiskPlan={},_cachedSettings={};
+let _allTrades=[],_accounts=[],curAccount=null;
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
 async function loadAllData(){
   try{
-    const [tradeData,journalData,badgeData,milestoneData,riskData,settingsData]=await Promise.all([
+    const [tradeData,journalData,badgeData,milestoneData,riskData,settingsData,acctData]=await Promise.all([
       api('GET','/api/trades'),api('GET','/api/journals'),api('GET','/api/badges'),
-      api('GET','/api/milestones'),api('GET','/api/riskplan'),api('GET','/api/settings')
+      api('GET','/api/milestones'),api('GET','/api/riskplan'),api('GET','/api/settings'),
+      api('GET','/api/accounts').catch(()=>[])
     ]);
-    trades=tradeData||[];_cachedJournals=journalData||{};_cachedBadges=badgeData||{};
+    _allTrades=tradeData||[];_accounts=acctData||[];
+    const savedAcct=parseInt(localStorage.getItem('soa_acct'))||null;
+    curAccount=savedAcct&&_accounts.some(a=>a.id===savedAcct)?savedAcct:null;
+    trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;
+    _cachedJournals=journalData||{};_cachedBadges=badgeData||{};
     _cachedMilestones=milestoneData||{};
     _cachedRiskPlan=riskData||{};_cachedSettings=settingsData||{};_dataLoaded=true;
   }catch(err){console.error('Failed to load data:',err);trades=[];_dataLoaded=true}
@@ -1025,8 +1047,10 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=_t?_t.l.replace('★ ',''):'Dashboard';const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0]}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'AI Coach'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=_t?_t.l.replace('★ ',''):'Dashboard';const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
+function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
+function setAccount(v){curAccount=v?parseInt(v):null;localStorage.setItem('soa_acct',v||'');trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;ren()}
 function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
 
 // ─── STATS ───
@@ -1107,6 +1131,26 @@ function rDash(el){
     </div>
     ${buildStreakWidget()}
     </div>
+    ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
+      const at=_allTrades.filter(t=>t.accountId===a.id);
+      if(!at.length&&!a.profitTarget&&!a.payoutMin)return'';
+      const net=at.reduce((x,t)=>x+(t.pnl||0),0);
+      const days=[...new Set(at.map(t=>dKey(t.date)))].filter(Boolean);
+      const byDay={};at.forEach(t=>{const k=dKey(t.date);byDay[k]=(byDay[k]||0)+(t.pnl||0)});
+      const bestDay=Math.max(...Object.values(byDay).concat([0]));
+      const consist=net>0?(bestDay/net*100):0;
+      const target=a.phase==='funded'?(a.payoutMin||0):(a.profitTarget||0);
+      const checks=[];
+      if(target>0)checks.push({ok:net>=target,txt:(a.phase==='funded'?'Payout min ':'Target ')+f$(target)+' — '+(net>=target?'reached':f$(target-net)+' to go')});
+      if(a.minDays>0)checks.push({ok:days.length>=a.minDays,txt:days.length+' / '+a.minDays+' trading days'});
+      if(a.consistencyPct>0&&net>0)checks.push({ok:consist<=a.consistencyPct,txt:'Consistency '+consist.toFixed(0)+'% (max '+a.consistencyPct+'%)'});
+      const eligible=checks.length&&checks.every(c=>c.ok);
+      return`<div class="payout-card${eligible?' ok':''}">
+        <div class="payout-head"><span class="payout-name">${esc(a.name)}</span><span class="payout-status" style="color:${eligible?'var(--green)':'var(--yellow)'}">${eligible?'ELIGIBLE':a.phase==='funded'?'FUNDED':'EVAL'}</span></div>
+        <div class="payout-net" style="color:${net>=0?'var(--green)':'var(--red)'}">${f$(net)}</div>
+        <div class="payout-sub">${at.length} trades · ${days.length} days</div>
+        ${checks.map(c=>`<div class="payout-check"><span style="color:${c.ok?'var(--green)':'var(--text-muted)'}">${c.ok?'✓':'○'}</span> ${c.txt}</div>`).join('')}
+      </div>`}).join('')}</div>`:''}
     <div class="dash-mid">
       <div class="dash-equity fade-up" style="animation-delay:.25s;margin-bottom:0">
         <div class="dash-bottom-title">Equity Curve</div>
@@ -2415,12 +2459,46 @@ function rRisk(el){
 }
 
 // ═══ SETTINGS ═══
+function renderAcctForm(a){
+  a=a||{};const idp=a.id?"'"+a.id+"'":'null';
+  return`<div class="acct-card" data-aid="${a.id||''}">
+    <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+      <div class="field"><label>Account name</label><input value="${esc(a.name||'')}" data-f="name" placeholder="MFF Express 50K"></div>
+      <div class="field"><label>Firm</label><input value="${esc(a.firm||'')}" data-f="firm" placeholder="My Funded Futures"></div>
+      <div class="field"><label>Environment</label><select data-f="env"><option value="demo"${a.env!=='live'?' selected':''}>Demo / Eval</option><option value="live"${a.env==='live'?' selected':''}>Live</option></select></div>
+      <div class="field"><label>Phase</label><select data-f="phase"><option value="eval"${a.phase!=='funded'?' selected':''}>Evaluation</option><option value="funded"${a.phase==='funded'?' selected':''}>Funded</option></select></div>
+      <div class="field"><label>Broker account IDs (comma-sep)</label><input value="${esc(a.brokerIds||'')}" data-f="brokerIds" placeholder="MFFUSFPRO06025084"></div>
+      <div class="field"><label>Tradovate username</label><input value="${esc(a.tvUser||'')}" data-f="tvUser" autocomplete="off"></div>
+      <div class="field"><label>Tradovate password ${a.hasCredentials?'(saved)':''}</label><input type="password" data-f="tvPass" placeholder="${a.hasCredentials?'••••••••':''}" autocomplete="new-password"></div>
+      <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
+      <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
+      <div class="field"><label>Min trading days</label><input type="number" value="${a.minDays||''}" data-f="minDays"></div>
+      <div class="field"><label>Consistency max %</label><input type="number" value="${a.consistencyPct||''}" data-f="consistencyPct"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn-primary" onclick="saveAcct(this,${idp})">${a.id?'Save changes':'Add account'}</button>
+      ${a.id?`<button class="btn-sm" onclick="syncAcct(this,${a.id})">Sync from Tradovate</button><button class="btn-sm" style="color:var(--red)" onclick="delAcct(${a.id})">Delete</button><span style="font-size:11px;color:var(--text-muted)">${a.lastSync?'Last sync '+fD(a.lastSync):'Never synced'}</span>`:''}
+      <span class="acct-msg" style="font-size:12px;color:var(--text-muted)"></span>
+    </div>
+  </div>`;
+}
+function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct'].forEach(k=>o[k]=Number(o[k])||0);return o}
+function saveAcct(btn,id){const card=btn.closest('.acct-card');const o=readAcctForm(card);if(id)o.id=parseInt(id);const msg=card.querySelector('.acct-msg');msg.textContent='Saving...';api('POST','/api/accounts',o).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];msg.textContent='Saved';refreshAcctSwitch();setTimeout(()=>ren(),400)}).catch(e=>{msg.textContent=e.message})}
+function delAcct(id){if(!confirm('Delete this account? Its trades stay but become unassigned.'))return;api('DELETE','/api/accounts/'+id).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];_allTrades.forEach(t=>{if(t.accountId===id)t.accountId=null});if(curAccount===id)setAccount('');else ren()}).catch(e=>alert(e.message))}
+function syncAcct(btn,id){const card=btn.closest('.acct-card');const msg=card.querySelector('.acct-msg');msg.textContent='Syncing with Tradovate...';btn.disabled=true;api('POST','/api/accounts/'+id+'/sync',{}).then(d=>{msg.textContent='Imported '+d.imported+' new trade'+(d.imported!==1?'s':'')+' ('+d.matched+' matched)';return loadAllData()}).then(()=>{setTimeout(()=>ren(),900)}).catch(e=>{msg.textContent=e.message;btn.disabled=false})}
 function rSettings(el){
   const tradeCount=trades.length;
   const badgeCount=Object.keys(gBdg()).length;
   const msCount=Object.keys(getMilestones()).length;
-  el.innerHTML=`<div style="max-width:600px;margin:0 auto" class="fade-up">
-    <h2 style="font-size:20px;font-weight:800;margin-bottom:24px">⚙️ Settings</h2>
+  el.innerHTML=`<div style="max-width:760px;margin:0 auto" class="fade-up">
+    <h2 style="font-size:20px;font-weight:800;margin-bottom:24px">Settings</h2>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Trading Accounts</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Track each prop firm account separately. Add your Tradovate login to sync trades automatically — no more CSVs. Broker account IDs route CSV imports to the right account too.</div>
+      ${_accounts.map(a=>renderAcctForm(a)).join('')}
+      ${renderAcctForm(null)}
+    </div>
     
     <div class="card" style="margin-bottom:16px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Account Info</div>
@@ -3043,12 +3121,12 @@ function handleImportFile(file){if(!file)return;const status=document.getElement
         return;
       }
       
-      if(!hasBS&&!hasContract){status.innerHTML='<div class="import-status error">Could not detect broker format. Make sure you selected the right broker and exported the correct file.</div>';return}const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length){status.innerHTML='<div class="import-status error">No filled orders found.</div>';return}filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({date:normalizeDate(date.split(' ')[0]||date.split('T')[0])||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});if(!rts.length){status.innerHTML='<div class="import-status error">Could not match round-trip trades.</div>';return}pendingImports=rts;const totalPnl=rts.reduce((s,t)=>s+t.pnl,0);const totalFees=rts.reduce((s,t)=>s+(t.fees||0),0);const totalGross=rts.reduce((s,t)=>s+(t.grossPnl||0),0);let table=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length>1?'s':''} found</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)"><table class="import-preview-table"><thead><tr><th>Date</th><th>Product</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Fees</th><th>Net P&L</th></tr></thead><tbody>`;rts.slice(0,30).forEach(t=>{table+=`<tr><td>${t.date}</td><td>${t.product}</td><td style="color:${t.direction==='Long'?'var(--green)':'var(--red)'}">${t.direction==='Long'?'▲':'▼'}</td><td>${t.entryPrice}</td><td>${t.exitPrice}</td><td style="color:${(t.grossPnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.grossPnl||0)}</td><td style="color:var(--red)">${f$(t.fees||0)}</td><td style="color:${t.pnl>=0?'var(--green)':'var(--red)'}; font-weight:700">${f$(t.pnl)}</td></tr>`});if(rts.length>30)table+=`<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">+${rts.length-30} more</td></tr>`;table+='</tbody></table></div></div>';document.getElementById('importPreview').innerHTML=table;status.innerHTML=`<div class="import-status success">✓ ${rts.length} trades ready — click Review to tag each one</div>`;document.getElementById('btnImportConfirm').style.display='inline-block'}catch(err){console.error(err);status.innerHTML=`<div class="import-status error">Error: ${err.message}</div>`}};reader.readAsText(file)}
+      if(!hasBS&&!hasContract){status.innerHTML='<div class="import-status error">Could not detect broker format. Make sure you selected the right broker and exported the correct file.</div>';return}const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length){status.innerHTML='<div class="import-status error">No filled orders found.</div>';return}filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const brokerAccount=o['Account']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({brokerAccount,date:normalizeDate(date.split(' ')[0]||date.split('T')[0])||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});if(!rts.length){status.innerHTML='<div class="import-status error">Could not match round-trip trades.</div>';return}pendingImports=rts;const totalPnl=rts.reduce((s,t)=>s+t.pnl,0);const totalFees=rts.reduce((s,t)=>s+(t.fees||0),0);const totalGross=rts.reduce((s,t)=>s+(t.grossPnl||0),0);let table=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length>1?'s':''} found</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)"><table class="import-preview-table"><thead><tr><th>Date</th><th>Product</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Fees</th><th>Net P&L</th></tr></thead><tbody>`;rts.slice(0,30).forEach(t=>{table+=`<tr><td>${t.date}</td><td>${t.product}</td><td style="color:${t.direction==='Long'?'var(--green)':'var(--red)'}">${t.direction==='Long'?'▲':'▼'}</td><td>${t.entryPrice}</td><td>${t.exitPrice}</td><td style="color:${(t.grossPnl||0)>=0?'var(--green)':'var(--red)'}">${f$(t.grossPnl||0)}</td><td style="color:var(--red)">${f$(t.fees||0)}</td><td style="color:${t.pnl>=0?'var(--green)':'var(--red)'}; font-weight:700">${f$(t.pnl)}</td></tr>`});if(rts.length>30)table+=`<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">+${rts.length-30} more</td></tr>`;table+='</tbody></table></div></div>';document.getElementById('importPreview').innerHTML=table;status.innerHTML=`<div class="import-status success">✓ ${rts.length} trades ready — click Review to tag each one</div>`;document.getElementById('btnImportConfirm').style.display='inline-block'}catch(err){console.error(err);status.innerHTML=`<div class="import-status error">Error: ${err.message}</div>`}};reader.readAsText(file)}
 
 // ─── REVIEW SLIDESHOW ───
 function startReview(){if(!pendingImports.length)return;
 // Filter out duplicates BEFORE review so user doesn't waste time reviewing them
-const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));
+const existing=new Set(_allTrades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));
 let dupCount=0;
 reviewData=pendingImports.filter(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){dupCount++;return false}return true});
 if(!reviewData.length){document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">⚠️</div><h3 class="empty-title">All ${dupCount} trade${dupCount!==1?'s':''} are duplicates</h3><p class="empty-text">These trades are already in your journal. No new trades to import.</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport()">Done</button>`;return}
@@ -3123,7 +3201,7 @@ function removeReviewScreenshot(tradeIdx,imgIdx){
 function checkStorageUsage(){return 0;}
 
 function saveCurrentReview(){const t=reviewData[reviewIndex];const emo=document.getElementById('rv-emo');if(emo)t.emotionRating=parseInt(emo.value);const notes=document.getElementById('rv-notes');if(notes)t.notes=notes.value}
-function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const existing=new Set(trades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);trades.push({id:gId(),date:normalizeDate(rt.date)||rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});api('POST','/api/trades/bulk',{trades:trades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
+function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const existing=new Set(_allTrades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));reviewData.forEach(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){skipped++;return}existing.add(sig);const _acctMatch=_accounts.find(a=>rt.brokerAccount&&(a.brokerIds||'').split(',').map(x=>x.trim()).filter(Boolean).some(bid=>rt.brokerAccount.includes(bid)));_allTrades.push({id:gId(),accountId:_acctMatch?_acctMatch.id:curAccount||null,date:normalizeDate(rt.date)||rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;api('POST','/api/trades/bulk',{trades:_allTrades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>These trades were already in your journal.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
 
 // ─── TRADE MODAL ───
 function openModal(tr){editId=tr?tr.id:null;document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';const ssField=document.getElementById('modal-screenshots-field');const ssCont=document.getElementById('modal-screenshots');if(tr&&tr.screenshots&&tr.screenshots.length){ssField.style.display='block';ssCont.innerHTML=tr.screenshots.map(img=>`<img src="${img}" onclick="openScreenshot(this.src)" alt="Trade screenshot">`).join('')}else{ssField.style.display='none';ssCont.innerHTML=''}rSOA();switchModalTab('trade');document.getElementById('tradeModal').classList.add('active')}
@@ -3138,9 +3216,9 @@ function rSOA(){
   document.getElementById('rulesChecklist').innerHTML=RL.map((r,i)=>`<div class="rule-item${fRules.includes(r)?' checked':''}" onclick="tgRule(${i});rSOA()"><span class="rule-check">${fRules.includes(r)?'✓':''}</span><span class="rule-text">${r}</span></div>`).join('')}
 function tgStrat(s){if(fSetup.includes(s))fSetup=fSetup.filter(x=>x!==s);else fSetup.push(s)}
 function tgRule(i){const r=RL[i];if(fRules.includes(r))fRules=fRules.filter(x=>x!==r);else fRules.push(r)}
-function saveTrade(){const t={id:editId||gId(),date:document.getElementById('f-date').value,instrument:document.getElementById('f-instrument').value,ticker:document.getElementById('f-ticker').value,direction:fDir,entryPrice:document.getElementById('f-entry').value,exitPrice:document.getElementById('f-exit').value,quantity:document.getElementById('f-qty').value,stopLoss:document.getElementById('f-sl').value,pnl:Number(document.getElementById('f-pnl').value)||0,fees:Number(document.getElementById('f-fees').value)||0,strategy:fSetup.join(' + ')||'No Strategy Used',emotionRating:fEmoRating,rulesFollowed:[...fRules],notes:document.getElementById('f-notes').value};if(editId)trades=trades.map(x=>x.id===editId?{...t,totw:x.totw}:x);else trades.push(t);svTr(t);chkBdg();chkMilestones();closeModal();ren()}
+function saveTrade(){const t={id:editId||gId(),date:document.getElementById('f-date').value,instrument:document.getElementById('f-instrument').value,ticker:document.getElementById('f-ticker').value,direction:fDir,entryPrice:document.getElementById('f-entry').value,exitPrice:document.getElementById('f-exit').value,quantity:document.getElementById('f-qty').value,stopLoss:document.getElementById('f-sl').value,pnl:Number(document.getElementById('f-pnl').value)||0,fees:Number(document.getElementById('f-fees').value)||0,strategy:fSetup.join(' + ')||'No Strategy Used',emotionRating:fEmoRating,rulesFollowed:[...fRules],notes:document.getElementById('f-notes').value};t.accountId=editId?(_allTrades.find(x=>x.id===editId)||{}).accountId||null:(curAccount||null);if(editId)_allTrades=_allTrades.map(x=>x.id===editId?{...t,totw:x.totw}:x);else _allTrades.push(t);trades=curAccount?_allTrades.filter(x=>x.accountId===curAccount):_allTrades;svTr(t);chkBdg();chkMilestones();closeModal();ren()}
 function editTr(id){const t=trades.find(x=>x.id===id);if(t)openModal(t)}
-function delTr(id){if(!confirm('Delete this trade?'))return;trades=trades.filter(t=>t.id!==id);api('DELETE','/api/trades/'+id).catch(err=>console.error(err));ren()}
+function delTr(id){if(!confirm('Delete this trade?'))return;_allTrades=_allTrades.filter(t=>t.id!==id);trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;api('DELETE','/api/trades/'+id).catch(err=>console.error(err));ren()}
 function openScreenshot(src){const ov=document.createElement('div');ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px';ov.onclick=()=>ov.remove();ov.innerHTML=`<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">`;document.body.appendChild(ov)}
 
 (function(){const savedToken=localStorage.getItem('soa_token');if(savedToken){authToken=savedToken;api('GET','/api/auth/me').then(data=>{loginAs(data.user.username,data.user.is_mentor)}).catch(()=>{localStorage.removeItem('soa_token');authToken=null;document.getElementById('loginScreen').style.display='flex';updateTickers()})}else{document.getElementById('loginScreen').style.display='flex';updateTickers()}})();

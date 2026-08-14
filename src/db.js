@@ -118,6 +118,26 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Prop firm accounts
+      CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(80) NOT NULL,
+        firm VARCHAR(80) DEFAULT '',
+        env VARCHAR(10) DEFAULT 'demo',
+        broker_ids TEXT DEFAULT '',
+        tv_user VARCHAR(120) DEFAULT '',
+        tv_pass_enc TEXT DEFAULT '',
+        phase VARCHAR(20) DEFAULT 'eval',
+        profit_target DECIMAL(12,2) DEFAULT 0,
+        max_drawdown DECIMAL(12,2) DEFAULT 0,
+        min_days INTEGER DEFAULT 0,
+        consistency_pct INTEGER DEFAULT 0,
+        payout_min DECIMAL(12,2) DEFAULT 0,
+        last_sync TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Mentor notes table
       CREATE TABLE IF NOT EXISTS mentor_notes (
         id SERIAL PRIMARY KEY,
@@ -136,6 +156,9 @@ const initDB = async () => {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(50) DEFAULT '';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(50) DEFAULT '';
 
+      -- Account link on trades (added later, safe to re-run)
+      ALTER TABLE trades ADD COLUMN IF NOT EXISTS account_id INTEGER;
+
       -- Pre-market columns (added later, safe to re-run)
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_bias VARCHAR(20) DEFAULT '';
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_mental_state INTEGER DEFAULT 0;
@@ -152,6 +175,8 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_milestones_user ON milestones(user_id);
       CREATE INDEX IF NOT EXISTS idx_coach_messages_user ON coach_messages(user_id);
       CREATE INDEX IF NOT EXISTS idx_coach_memory_user ON coach_memory(user_id);
+      CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_trades_account ON trades(account_id);
     `);
     console.log('Database initialized successfully');
   } catch (err) {
