@@ -305,6 +305,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-imgchip{position:relative;display:inline-block;margin-bottom:8px}
 .coach-imgchip img{height:52px;border-radius:6px;border:1px solid var(--border);display:block}
 .coach-imgchip button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:var(--bg-elevated);color:var(--text-primary);font-size:10px;cursor:pointer}
+.coach-docchip{display:inline-flex;align-items:center;gap:7px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text-secondary);margin-bottom:8px}
+.coach-docchip button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:0}
 .coach-dots{display:inline-flex;gap:4px;padding:4px 2px}
 .coach-dots i{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:coachBlink 1.2s infinite}
 .coach-dots i:nth-child(2){animation-delay:.2s}
@@ -1251,7 +1253,7 @@ function rTL(el){let fi=filterDate?trades.filter(t=>dKey(t.date)===filterDate):[
 }
 
 // ─── AI COACH ───
-let _coachHist=null,_coachImg=null,_coachBusy=false;
+let _coachHist=null,_coachImg=null,_coachDoc=null,_coachBusy=false;
 function rCoach(el){
   el.innerHTML=`<div class="coach fade-up">
     <div class="coach-msgs" id="coachMsgs"><div class="coach-loading">Loading your coach...</div></div>
@@ -1260,15 +1262,15 @@ function rCoach(el){
     <div class="coach-bar">
       <label class="coach-attach" title="Attach a chart screenshot">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
-        <input type="file" accept="image/*" style="display:none" onchange="coachPickImg(this)">
+        <input type="file" accept="image/*,.docx,.txt,.md" style="display:none" onchange="coachPickImg(this)">
       </label>
-      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask your coach anything — or drop in a chart screenshot" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
+      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask your coach anything — or drop a chart screenshot or notes document (.docx)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
       <button class="btn-primary" onclick="sendCoach()" id="coachSendBtn">Send</button>
     </div>
   </div>`;
   const box=el.querySelector('.coach');
   box.addEventListener('dragover',e=>{e.preventDefault()});
-  box.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files.length)coachSetImg(e.dataTransfer.files[0])});
+  box.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files.length)coachSetFile(e.dataTransfer.files[0])});
   if(_coachHist){renderCoach()}else{
     api('GET','/api/coach/history').then(d=>{_coachHist=d.messages||[];renderCoach()}).catch(()=>{_coachHist=[];renderCoach()});
   }
@@ -1307,7 +1309,20 @@ function renderCoachChips(){
     return`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`;
   }).join('');
 }
-function coachPickImg(input){if(input.files&&input.files[0])coachSetImg(input.files[0]);input.value=''}
+function coachPickImg(input){if(input.files&&input.files[0])coachSetFile(input.files[0]);input.value=''}
+function coachSetFile(file){
+  if(/\.(docx|txt|md)$/i.test(file.name)){
+    if(file.size>8*1024*1024){alert('Document too large (max 8MB)');return}
+    const r=new FileReader();
+    r.onload=e=>{
+      _coachDoc={name:file.name,data:e.target.result};_coachImg=null;
+      const p=document.getElementById('coachImgPrev');
+      if(p)p.innerHTML=`<div class="coach-docchip"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 1.5h8.5L14 4v10.5H3z"/><path d="M6 6h5M6 9h5M6 12h3"/></svg><span>${esc(file.name)}</span><button onclick="_coachDoc=null;this.parentElement.remove()">✕</button></div>`;
+    };
+    r.readAsDataURL(file);
+  }else if(file.type.startsWith('image/')){coachSetImg(file)}
+  else alert('Attach an image, .docx, .txt, or .md file');
+}
 function coachSetImg(file){
   compressImage(file,1000,0.65).then(dataUrl=>{
     _coachImg=dataUrl;
@@ -1319,15 +1334,16 @@ function sendCoach(){
   if(_coachBusy)return;
   const inp=document.getElementById('coachInput');
   const text=(inp?inp.value:'').trim();
-  if(!text&&!_coachImg)return;
+  if(!text&&!_coachImg&&!_coachDoc)return;
   const img=_coachImg;_coachImg=null;
+  const doc=_coachDoc;_coachDoc=null;
   const prev=document.getElementById('coachImgPrev');if(prev)prev.innerHTML='';
   if(inp)inp.value='';
-  _coachHist.push({role:'user',content:text||'[chart screenshot]'+(img?' attached':''),has_image:!!img});
+  _coachHist.push({role:'user',content:(text||(doc?'Document upload':'[chart screenshot] attached'))+(doc?' [document attached: '+doc.name+']':''),has_image:!!img});
   const m=document.getElementById('coachMsgs');
   if(m){renderCoach();m.insertAdjacentHTML('beforeend','<div class="coach-msg ai" id="coachTyping"><div class="coach-bubble"><span class="coach-dots"><i></i><i></i><i></i></span></div></div>');m.scrollTop=m.scrollHeight}
   _coachBusy=true;const btn=document.getElementById('coachSendBtn');if(btn)btn.disabled=true;
-  api('POST','/api/coach/chat',{message:text,image:img||undefined}).then(d=>{
+  api('POST','/api/coach/chat',{message:text,image:img||undefined,doc:doc||undefined}).then(d=>{
     _coachHist.push({role:'assistant',content:d.reply});
     if(/journal|debrief/i.test(d.reply))api('GET','/api/journals').then(j=>{_cachedJournals=j||_cachedJournals}).catch(()=>{});
   }).catch(err=>{

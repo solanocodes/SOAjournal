@@ -533,6 +533,18 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
 // AI COACH CHAT
 // ═══════════════════════════════════
 
+const AdmZip = require('adm-zip');
+function docxToText(buf) {
+  const zip = new AdmZip(buf);
+  const entry = zip.getEntry('word/document.xml');
+  if (!entry) throw new Error('Not a valid .docx file');
+  let xml = entry.getData().toString('utf8');
+  xml = xml.replace(/<w:p[ >]/g, '\n<w:p ').replace(/<w:tab\/>/g, '\t');
+  let text = xml.replace(/<[^>]+>/g, '');
+  text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 const COACH_SYSTEM = `You are the SOA Coach — the in-app trading coach inside the SOA Trading Journal, mentoring futures traders who follow the SOA system.
 
 SOA system context: strategies are SOA Levels, Fibonacci Golden Pocket, TFC, and Orderblocks. The 8 rules: followed max loss per trade; followed max loss per day; waited for confirmation candle; traded at key level / liquidity zone; proper position sizing; did not resize mid-trade; stopped at trade limit; followed stop loss plan.
@@ -543,6 +555,8 @@ You have tools that query the trader's REAL data. Rules for you:
 - Use remember(kind, content) to save durable facts the trader tells you or commits to. kinds: profile (who they are, account situation), playbook (their entry model / trading rules), commitment (things they commit to doing), flag (patterns you have flagged), question (open questions like withdrawal timing). Save conclusions, not chit-chat. Keep each memory under 200 characters.
 - When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
 - If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
+
+DOCUMENTS: when the trader attaches a document, it is teach-the-coach material — usually their trading notes, entry model write-up, or summaries of past coaching conversations. Read it fully, extract every durable fact (entry model rules, risk/withdrawal plans, goals, known patterns and struggles, commitments), and save each one with remember() using the right kind. Then reply with a short bullet summary of what you learned and stored — do not quote the document back at length. If it conflicts with what you already know, ask about the conflict.
 
 DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
 
@@ -698,8 +712,8 @@ app.get('/api/coach/history', authMiddleware, async (req, res) => {
 app.post('/api/coach/chat', authMiddleware, async (req, res) => {
   if (!anthropic) return res.status(503).json({ error: 'Coach is not configured yet' });
   try {
-    const { message, image } = req.body;
-    if (!message && !image) return res.status(400).json({ error: 'Empty message' });
+    const { message, image, doc } = req.body;
+    if (!message && !image && !doc) return res.status(400).json({ error: 'Empty message' });
 
     const used = (await pool.query(
       "SELECT COUNT(*)::int AS c FROM coach_messages WHERE user_id = $1 AND role = 'user' AND created_at > NOW() - INTERVAL '24 hours'", [req.user.id]
@@ -731,7 +745,23 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       if (messages.length && messages[messages.length-1].role === h.role) messages[messages.length-1].content += '\n' + h.content;
       else messages.push({ role: h.role, content: h.content });
     }
-    const userText = message || 'Please analyze this chart screenshot.';
+    let userText = message || (doc ? 'I\'ve attached a document for you to learn from.' : 'Please analyze this chart screenshot.');
+    let docNote = '';
+    if (doc && doc.data) {
+      try {
+        const buf = Buffer.from(String(doc.data).replace(/^data:[^;]+;base64,/, ''), 'base64');
+        if (buf.length > 8 * 1024 * 1024) return res.status(400).json({ error: 'Document too large (max 8MB)' });
+        const nm = String(doc.name || 'document');
+        let text;
+        if (/\.docx$/i.test(nm)) text = docxToText(buf);
+        else text = buf.toString('utf8');
+        text = text.slice(0, 60000);
+        docNote = ' [document attached: ' + nm + ']';
+        userText = userText + '\n\n=== ATTACHED DOCUMENT: ' + nm + ' ===\n' + text + '\n=== END DOCUMENT ===';
+      } catch (e) {
+        return res.status(400).json({ error: 'Could not read that document — is it a valid .docx or text file?' });
+      }
+    }
     let userContent = userText;
     if (image) {
       const m = String(image).match(/^data:(image\/\w+);base64,(.+)$/s);
@@ -744,7 +774,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     messages.push({ role: 'user', content: userContent });
 
     await pool.query('INSERT INTO coach_messages (user_id, role, content, has_image) VALUES ($1,$2,$3,$4)',
-      [req.user.id, 'user', userText + (image ? ' [chart screenshot attached]' : ''), !!image]);
+      [req.user.id, 'user', (message || 'Document upload') + (image ? ' [chart screenshot attached]' : '') + docNote, !!image]);
 
     let reply = '';
     for (let i = 0; i < 6; i++) {
