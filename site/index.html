@@ -299,6 +299,20 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-bar{display:flex;gap:10px;align-items:flex-end;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg-deep)}
 .coach-attach{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;flex:none}
 .coach-attach:hover{color:var(--accent);border-color:var(--accent)}
+.coach-attach.rec{color:var(--red);border-color:var(--red);animation:micPulse 1.4s infinite}
+@keyframes micPulse{0%,100%{opacity:1}50%{opacity:.55}}
+.mi-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--yellow);margin-bottom:8px}
+.mi-clear{font-size:12.5px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:18px}
+#mentorInsights .mi-row{background:var(--bg-card);border:1px solid var(--border);border-left:2px solid var(--yellow);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px}
+#mentorInsights{margin-bottom:18px}
+.mi-name{font-weight:650;color:var(--text-primary)}
+.mi-issues{color:var(--text-secondary);font-size:12.5px;margin-left:6px}
+.mi-commit{font-size:11.5px;color:var(--text-muted);margin-top:3px}
+.mem-kind{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);margin:12px 0 6px}
+.mem-kind:first-child{margin-top:0}
+.mem-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--bg-elevated);color:var(--text-secondary);font-size:12.5px;line-height:1.45}
+.mem-row button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px}
+.mem-row button:hover{color:var(--red)}
 .coach-input{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13.5px;padding:8px 12px;resize:none;min-height:34px;max-height:120px;font-family:inherit}
 .coach-input:focus{border-color:var(--accent)}
 .coach-imgprev{padding:0 22px}
@@ -1054,7 +1068,7 @@ function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Cal
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){curAccount=v?parseInt(v):null;localStorage.setItem('soa_acct',v||'');trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;ren()}
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el)}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function')setTimeout(loadMentorInsights,0)}
 
 // ─── STATS ───
 function cStats(tr){const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<0);const wr=tr.length?w.length/tr.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length,sk,ar,avgEmo,em,st,cv}}
@@ -1260,7 +1274,10 @@ function rCoach(el){
     <div class="coach-chips" id="coachChips"></div>
     <div id="coachImgPrev" class="coach-imgprev"></div>
     <div class="coach-bar">
-      <label class="coach-attach" title="Attach a chart screenshot">
+      <button class="coach-attach" id="coachMicBtn" title="Speak your message" onclick="coachToggleMic(this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"/><path d="M3.5 7.5a4.5 4.5 0 009 0M8 12v2.5M5.5 14.5h5"/></svg>
+      </button>
+      <label class="coach-attach" title="Attach a chart screenshot or document">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
         <input type="file" accept="image/*,.docx,.txt,.md" style="display:none" onchange="coachPickImg(this)">
       </label>
@@ -1309,6 +1326,21 @@ function renderCoachChips(){
     return`<button class="coach-chip" onclick="document.getElementById('coachInput').value=this.textContent;sendCoach()">${q}</button>`;
   }).join('');
 }
+let _coachRec=null;
+function coachToggleMic(btn){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){alert('Voice input is not supported in this browser — try Chrome, Edge, or Safari.');return}
+  if(_coachRec){_coachRec.stop();return}
+  const inp=document.getElementById('coachInput');
+  const base=inp&&inp.value?inp.value.replace(/\s+$/,'')+' ':'';
+  let finalT='';
+  const rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang='en-US';
+  rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)finalT+=r[0].transcript;else interim+=r[0].transcript}if(inp)inp.value=base+finalT+interim};
+  rec.onend=()=>{_coachRec=null;const b=document.getElementById('coachMicBtn');if(b)b.classList.remove('rec')};
+  rec.onerror=()=>{rec.onend()};
+  _coachRec=rec;rec.start();btn.classList.add('rec');
+  if(inp)inp.focus();
+}
 function coachPickImg(input){if(input.files&&input.files[0])coachSetFile(input.files[0]);input.value=''}
 function coachSetFile(file){
   if(/\.(docx|txt|md)$/i.test(file.name)){
@@ -1343,9 +1375,21 @@ function sendCoach(){
   const m=document.getElementById('coachMsgs');
   if(m){renderCoach();m.insertAdjacentHTML('beforeend','<div class="coach-msg ai" id="coachTyping"><div class="coach-bubble"><span class="coach-dots"><i></i><i></i><i></i></span></div></div>');m.scrollTop=m.scrollHeight}
   _coachBusy=true;const btn=document.getElementById('coachSendBtn');if(btn)btn.disabled=true;
-  api('POST','/api/coach/chat',{message:text,image:img||undefined,doc:doc||undefined}).then(d=>{
-    _coachHist.push({role:'assistant',content:d.reply});
-    if(/journal|debrief/i.test(d.reply))api('GET','/api/journals').then(j=>{_cachedJournals=j||_cachedJournals}).catch(()=>{});
+  if(_coachRec)_coachRec.stop();
+  fetch('/api/coach/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({message:text,image:img||undefined,doc:doc||undefined})}).then(async r=>{
+    if(!r.ok||!(r.headers.get('content-type')||'').includes('text/plain')){
+      const e=await r.json().catch(()=>({}));throw new Error(e.error||'Coach is unavailable right now');
+    }
+    const t=document.getElementById('coachTyping');
+    const bub=t?t.querySelector('.coach-bubble'):null;
+    const reader=r.body.getReader();const dec=new TextDecoder();let live='';
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      live+=dec.decode(value,{stream:true});
+      if(bub){bub.innerHTML=coachMdEsc(live);const m=document.getElementById('coachMsgs');if(m)m.scrollTop=m.scrollHeight}
+    }
+    _coachHist.push({role:'assistant',content:live||'…'});
+    if(/journal|debrief/i.test(live))api('GET','/api/journals').then(j=>{_cachedJournals=j||_cachedJournals}).catch(()=>{});
   }).catch(err=>{
     _coachHist.push({role:'assistant',content:'**'+(err.message||'Coach is unavailable right now')+'**'});
   }).finally(()=>{
@@ -1366,7 +1410,7 @@ function rReport(el){const{s:st,e:en}=wRange(repOff);const wt=trades.filter(t=>{
 function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div class="empty-icon">🔒</div><h3 class="empty-title">Mentor access only</h3></div>';return}
   if(!_studentsLoaded){el.innerHTML='<div class="empty-state fade-up"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading students...</h3></div>';api('GET','/api/mentor/students').then(data=>{_cachedStudents=data||[];_studentsLoaded=true;ren()}).catch(err=>{console.error(err);el.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><h3 class="empty-title">Failed to load students</h3></div>'});return}
   if(!_cachedStudents.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">👥</div><h3 class="empty-title">No students yet</h3></div>`;return}
-  let h='<h3 style="font-size:18px;font-weight:700;margin-bottom:20px" class="fade-up">★ Mentor Panel</h3><div class="mentor-student-list">';
+  let h='<h3 style="font-size:18px;font-weight:700;margin-bottom:20px" class="fade-up">★ Mentor Panel</h3><div id="mentorInsights"></div><div class="mentor-student-list">';
   _cachedStudents.forEach((s,i)=>{const isV=mViewUser===s.username;h+=`<div class="mentor-student-row${isV?' active':''} fade-up stagger-${Math.min(i+1,8)}" onclick="mViewUser=mViewUser==='${s.username}'?null:'${s.username}';if(mViewUser)loadStuDetail('${s.id}','${s.username}');ren()"><div><div class="mentor-student-name">${esc(s.fullName)}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">@${esc(s.username)}</div></div><div class="mentor-student-stats"><span>${s.tradeCount} trades</span>${s.tradeCount>0?`<span style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'}">${f$(s.totalPnl)}</span><span>${s.winRate.toFixed(0)}% WR</span><span>${s.avgEmotion.toFixed(1)} emo</span>`:'<span style="color:var(--text-muted)">No trades yet</span>'}</div></div>`;
     if(isV){
       const det=_cachedStudentDetail[s.username];
@@ -1425,6 +1469,26 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
     </div>`;
   }
   el.innerHTML=h}
+let _mentorInsights=null;
+function loadMentorInsights(){
+  const el=document.getElementById('mentorInsights');if(!el)return;
+  const render=list=>{
+    const issues=list.filter(x=>x.overTradeDays7||x.lossBreachDays7||(x.journalGapDays!=null&&x.journalGapDays>=3)||x.journalGapDays==null);
+    if(!issues.length){el.innerHTML='<div class="mi-clear">Coach report: no flags this week — everyone journaling and inside their limits.</div>';return}
+    el.innerHTML='<div class="mi-title">Coach flags · last 7 days</div>'+issues.map(x=>{
+      const bits=[];
+      if(x.journalGapDays==null)bits.push('never journaled');
+      else if(x.journalGapDays>=3)bits.push('no journal in '+x.journalGapDays+' days');
+      if(x.overTradeDays7)bits.push('over trade limit on '+x.overTradeDays7+' day'+(x.overTradeDays7>1?'s':''));
+      if(x.lossBreachDays7)bits.push('broke daily loss limit '+x.lossBreachDays7+'×');
+      const cm=x.commitments.length?'<div class="mi-commit">Committed: '+esc(x.commitments[0])+'</div>':'';
+      return'<div class="mi-row"><div><span class="mi-name">'+esc(x.name)+'</span> <span class="mi-issues">'+bits.join(' · ')+'</span>'+cm+'</div></div>';
+    }).join('');
+  };
+  if(_mentorInsights){render(_mentorInsights);return}
+  el.innerHTML='<div class="mi-clear">Loading coach flags…</div>';
+  api('GET','/api/mentor/insights').then(d=>{_mentorInsights=d||[];render(_mentorInsights)}).catch(()=>{el.innerHTML=''});
+}
 function loadStuDetail(id,username){if(_cachedStudentDetail[username])return;api('GET','/api/mentor/student/'+id).then(data=>{_cachedStudentDetail[username]=data;const now=new Date();_stuCalY[username]=now.getFullYear();_stuCalM[username]=now.getMonth();ren()}).catch(err=>console.error(err))}
 
 function buildStudentCal(stuTrades,username){const now=new Date();const y=_stuCalY[username]||now.getFullYear();const m=_stuCalM[username]??now.getMonth();const fi=new Date(y,m,1),la=new Date(y,m+1,0),sd=fi.getDay(),td=la.getDate(),mn=fi.toLocaleString('default',{month:'long',year:'numeric'});const dp={},dc={};stuTrades.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0);dc[k]=(dc[k]||0)+1});let c=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-hdr">${d}</div>`).join('');for(let i=0;i<sd;i++)c+='<div class="cal-day cal-empty"></div>';for(let d=1;d<=td;d++){const k=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const p=dp[k],ct=dc[k],h=p!==undefined;c+=`<div class="cal-day ${h?(p>=0?'green':'red'):''}"><span class="cal-num">${d}</span>${h?`<span class="cal-pnl" style="color:${p>=0?'var(--green)':'var(--red)'}">${f$(p)}</span><span class="cal-cnt">${ct} trade${ct>1?'s':''}</span>`:''}</div>`}
@@ -2485,6 +2549,20 @@ function rRisk(el){
 }
 
 // ═══ SETTINGS ═══
+function loadCoachMemory(){
+  const el=document.getElementById('coachMemList');if(!el)return;
+  api('GET','/api/coach/memory').then(rows=>{
+    if(!rows.length){el.innerHTML='<div style="color:var(--text-muted)">Nothing yet — talk to your coach and it will start learning.</div>';return}
+    const kinds={profile:'Profile',playbook:'Playbook',commitment:'Commitments',flag:'Flags',question:'Open questions'};
+    let h='';
+    Object.entries(kinds).forEach(([k,label])=>{
+      const items=rows.filter(r=>r.kind===k);if(!items.length)return;
+      h+='<div class="mem-kind">'+label+'</div>'+items.map(r=>'<div class="mem-row"><span>'+esc(r.content)+'</span><button onclick="delCoachMem('+r.id+')" title="Forget this">✕</button></div>').join('');
+    });
+    el.innerHTML=h;
+  }).catch(()=>{el.innerHTML='<div style="color:var(--text-muted)">Could not load coach memory.</div>'});
+}
+function delCoachMem(id){api('DELETE','/api/coach/memory/'+id).then(loadCoachMemory).catch(e=>alert(e.message))}
 function renderAcctForm(a){
   a=a||{};const idp=a.id?"'"+a.id+"'":'null';
   return`<div class="acct-card" data-aid="${a.id||''}">
@@ -2524,6 +2602,12 @@ function rSettings(el){
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Track each prop firm account separately. Add your Tradovate login to sync trades automatically — no more CSVs. Broker account IDs route CSV imports to the right account too.</div>
       ${_accounts.map(a=>renderAcctForm(a)).join('')}
       ${renderAcctForm(null)}
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">What your coach knows</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Everything the AI Coach has saved about you — your profile, playbook, commitments, and flags. Remove anything that's wrong or outdated.</div>
+      <div id="coachMemList" style="font-size:13px;color:var(--text-muted)">Loading…</div>
     </div>
     
     <div class="card" style="margin-bottom:16px">
