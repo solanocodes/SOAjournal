@@ -12,6 +12,18 @@ const pool = new Pool({
 const initDB = async () => {
   const client = await pool.connect();
   try {
+    // A legacy "accounts" table (pre-dating this app's schema, no user_id column)
+    // blocks index creation and aborts the whole init. Move it aside, keep the data.
+    const hasAccounts = await client.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accounts'");
+    if (hasAccounts.rows.length) {
+      const hasUserId = await client.query(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'user_id'");
+      if (!hasUserId.rows.length) {
+        await client.query('ALTER TABLE accounts RENAME TO accounts_legacy_backup');
+        console.log('Renamed legacy accounts table to accounts_legacy_backup');
+      }
+    }
     await client.query(`
       -- Users table
       CREATE TABLE IF NOT EXISTS users (
