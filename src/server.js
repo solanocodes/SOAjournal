@@ -976,6 +976,10 @@ app.post('/api/accounts/:id/sync', authMiddleware, async (req, res) => {
 // SERVE FRONTEND
 // ═══════════════════════════════════
 
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, db: dbReady, uptime: Math.round(process.uptime()) });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'site', 'index.html'));
 });
@@ -984,16 +988,23 @@ app.get('*', (req, res) => {
 // START SERVER
 // ═══════════════════════════════════
 
+let dbReady = false;
 async function start() {
-  try {
-    await initDB();
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`SOA Trading Journal API running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-  }
+  // Listen first so the healthcheck passes and deploy logs stay inspectable
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`SOA Trading Journal API running on port ${PORT}`);
+  });
+  const tryInit = async (attempt) => {
+    try {
+      await initDB();
+      dbReady = true;
+      console.log('Database ready');
+    } catch (err) {
+      console.error(`Database init failed (attempt ${attempt}):`, err.message);
+      if (attempt < 20) setTimeout(() => tryInit(attempt + 1), 15000);
+    }
+  };
+  tryInit(1);
 }
 
 start();
