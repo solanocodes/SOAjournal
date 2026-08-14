@@ -291,62 +291,6 @@ app.post('/api/milestones/:milestoneId', authMiddleware, async (req, res) => {
 });
 
 // ═══════════════════════════════════
-// ROADMAP ROUTES
-// ═══════════════════════════════════
-
-app.get('/api/roadmap', authMiddleware, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT step_index, item_index FROM roadmap_progress WHERE user_id = $1',
-      [req.user.id]
-    );
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-app.post('/api/roadmap', authMiddleware, async (req, res) => {
-  try {
-    const { stepIndex, itemIndex, completed } = req.body;
-    if (completed) {
-      await pool.query(
-        'INSERT INTO roadmap_progress (user_id, step_index, item_index) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
-        [req.user.id, stepIndex, itemIndex]
-      );
-    } else {
-      await pool.query(
-        'DELETE FROM roadmap_progress WHERE user_id=$1 AND step_index=$2 AND item_index=$3',
-        [req.user.id, stepIndex, itemIndex]
-      );
-    }
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-app.post('/api/roadmap/sync', authMiddleware, async (req, res) => {
-  try {
-    const items = req.body.items || [];
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM roadmap_progress WHERE user_id = $1', [req.user.id]);
-      for (const item of items) {
-        await client.query(
-          'INSERT INTO roadmap_progress (user_id, step_index, item_index) VALUES ($1,$2,$3)',
-          [req.user.id, item.stepIndex, item.itemIndex]
-        );
-      }
-      await client.query('COMMIT');
-      res.json({ success: true });
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-// ═══════════════════════════════════
 // RISK PLAN ROUTES
 // ═══════════════════════════════════
 
@@ -444,13 +388,12 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
 app.get('/api/mentor/student/:id', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const userId = req.params.id;
-    const [user, trades, journals, badges, milestones, roadmap, riskplan] = await Promise.all([
+    const [user, trades, journals, badges, milestones, riskplan] = await Promise.all([
       pool.query('SELECT id, username, created_at FROM users WHERE id = $1', [userId]),
       pool.query('SELECT * FROM trades WHERE user_id = $1 ORDER BY date DESC', [userId]),
       pool.query('SELECT * FROM daily_journals WHERE user_id = $1', [userId]),
       pool.query('SELECT badge_id, earned_at FROM badges WHERE user_id = $1', [userId]),
       pool.query('SELECT milestone_id, earned_at FROM milestones WHERE user_id = $1', [userId]),
-      pool.query('SELECT step_index, item_index FROM roadmap_progress WHERE user_id = $1', [userId]),
       pool.query('SELECT * FROM risk_plans WHERE user_id = $1', [userId])
     ]);
 
@@ -473,7 +416,6 @@ app.get('/api/mentor/student/:id', authMiddleware, mentorOnly, async (req, res) 
       journals: journalMap,
       badges: badgeMap,
       milestones: milestoneMap,
-      roadmap: roadmap.rows,
       riskplan: riskplan.rows[0] || {}
     });
   } catch (err) {

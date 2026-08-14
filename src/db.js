@@ -75,17 +75,6 @@ const initDB = async () => {
         UNIQUE(user_id, milestone_id)
       );
 
-      -- Roadmap progress table
-      CREATE TABLE IF NOT EXISTS roadmap_progress (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        step_index INTEGER NOT NULL,
-        item_index INTEGER NOT NULL,
-        completed BOOLEAN DEFAULT TRUE,
-        completed_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(user_id, step_index, item_index)
-      );
-
       -- Risk plan table
       CREATE TABLE IF NOT EXISTS risk_plans (
         id SERIAL PRIMARY KEY,
