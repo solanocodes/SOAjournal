@@ -1122,10 +1122,11 @@ app.post('/api/accounts/:id/sync', authMiddleware, async (req, res) => {
 // ═══════════════════════════════════
 
 function etParts() {
-  const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23',
     weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const parts = {};
   f.formatToParts(new Date()).forEach(x => { parts[x.type] = x.value; });
+  if (parts.hour === '24') parts.hour = '00'; // ICU h24 quirk: midnight as "24"
   return parts;
 }
 
