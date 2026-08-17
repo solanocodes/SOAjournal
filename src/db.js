@@ -194,6 +194,10 @@ const initDB = async () => {
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_goals TEXT DEFAULT '';
       ALTER TABLE daily_journals ADD COLUMN IF NOT EXISTS pm_rules TEXT[] DEFAULT '{}';
 
+      -- One-time cleanup: a midnight-fired roll call wrongly stamped 2026-08-17
+      -- as posted; clear it so the real 5:30pm post fires. No-op after that date.
+      DELETE FROM app_state WHERE key = 'rollcall_last' AND value = '2026-08-17';
+
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
       CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
