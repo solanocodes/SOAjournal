@@ -230,6 +230,16 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dash-hero-stat strong{color:var(--text-primary);font-weight:700}
 
 .dash-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px}
+.range-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.range-pills{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.range-btn{background:transparent;border:0;color:var(--text-muted);font-size:12.5px;font-weight:500;padding:7px 13px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.range-btn:hover{color:var(--text-secondary)}
+.range-btn.active{background:var(--bg-elevated);color:var(--text-primary)}
+.range-dates{display:flex;align-items:center;gap:7px}
+.range-dates input{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:12.5px;padding:6px 9px;font-family:inherit;color-scheme:dark}
+.range-dates span{color:var(--text-muted);font-size:12px}
+.range-meta{font-size:11.5px;color:var(--text-muted);margin-left:auto}
+@media(max-width:820px){.range-meta{margin-left:0;width:100%}.range-pills{overflow-x:auto;max-width:100%}}
 .dash-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch}
 .dash-top .dash-hero{margin-bottom:0}
 .dash-mid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px}
@@ -1144,6 +1154,34 @@ function ren(){const el=document.getElementById('mainContent');el.innerHTML='';(
 // ─── STATS ───
 function cStats(tr){const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<0);const wr=tr.length?w.length/tr.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length,sk,ar,avgEmo,em,st,cv}}
 
+let dashRange=(()=>{try{return JSON.parse(localStorage.getItem('soa_range'))||{mode:'all'}}catch(e){return{mode:'all'}}})();
+function isoD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function rangeBounds(){
+  const n=new Date();
+  if(dashRange.mode==='mtd')return{from:isoD(new Date(n.getFullYear(),n.getMonth(),1)),to:isoD(n)};
+  if(dashRange.mode==='7d'){const f=new Date(n);f.setDate(f.getDate()-6);return{from:isoD(f),to:isoD(n)}}
+  if(dashRange.mode==='30d'){const f=new Date(n);f.setDate(f.getDate()-29);return{from:isoD(f),to:isoD(n)}}
+  if(dashRange.mode==='custom')return{from:dashRange.from||'',to:dashRange.to||''};
+  return null;
+}
+function rangeTrades(list){const b=rangeBounds();if(!b)return list||[];
+  return (list||[]).filter(t=>{const k=dKey(t.date);if(!k)return false;if(b.from&&k<b.from)return false;if(b.to&&k>b.to)return false;return true})}
+function rangeLabel(){const m=dashRange.mode;
+  if(m==='mtd')return'Month to date';if(m==='7d')return'Last 7 days';if(m==='30d')return'Last 30 days';
+  if(m==='custom'){const b=rangeBounds();return(b.from?fD(b.from):'Start')+' → '+(b.to?fD(b.to):'today')}
+  return'All time'}
+function setRange(mode){dashRange=Object.assign({},dashRange,{mode});localStorage.setItem('soa_range',JSON.stringify(dashRange));ren()}
+function setRangeCustom(which,val){dashRange.mode='custom';dashRange[which]=val;localStorage.setItem('soa_range',JSON.stringify(dashRange));ren()}
+function rangeBarHTML(){
+  const m=dashRange.mode;const b=rangeBounds();
+  const opt=(id,label)=>`<button class="range-btn${m===id?' active':''}" onclick="setRange('${id}')">${label}</button>`;
+  const n=rangeTrades(trades).length;
+  return`<div class="range-bar fade-up">
+    <div class="range-pills">${opt('all','All time')}${opt('mtd','MTD')}${opt('7d','7 days')}${opt('30d','30 days')}${opt('custom','Custom')}</div>
+    ${m==='custom'?`<div class="range-dates"><input type="date" value="${(b&&b.from)||''}" onchange="setRangeCustom('from',this.value)"><span>→</span><input type="date" value="${(b&&b.to)||''}" onchange="setRangeCustom('to',this.value)"></div>`:''}
+    <span class="range-meta">${n} trade${n!==1?'s':''}${m!=='all'?' · '+rangeLabel():''}</span>
+  </div>`;
+}
 // ─── DASHBOARD ───
 function buildMiniCal(){
   const n=new Date();const y=n.getFullYear(),m=n.getMonth();
@@ -1162,7 +1200,9 @@ function buildMiniCal(){
 }
 function rDash(el){
   if(!trades.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">📊</div><h3 class="empty-title">No trades logged yet</h3><p class="empty-text">Click "+ New Trade" or "Import CSV" to get started</p></div>`;return}
-  const s=cStats(trades);
+  const rngT=rangeTrades(trades);
+  if(!rngT.length){el.innerHTML=rangeBarHTML()+`<div class="empty-state fade-up"><div class="empty-title">No trades in ${rangeLabel().toLowerCase()}</div><p class="empty-text">Pick a wider range above to see your stats.</p></div>`;return}
+  const s=cStats(rngT);
   
   // Today/Week/Month P&L
   const now=new Date();
@@ -1195,27 +1235,27 @@ function rDash(el){
   
   // Strategy breakdown with P&L
   const byStrat={};
-  trades.forEach(t=>{const st=t.strategy||'Unknown';if(!byStrat[st])byStrat[st]={p:0,w:0,t:0};byStrat[st].t++;byStrat[st].p+=t.pnl||0;if(t.pnl>0)byStrat[st].w++});
+  rngT.forEach(t=>{const st=t.strategy||'Unknown';if(!byStrat[st])byStrat[st]={p:0,w:0,t:0};byStrat[st].t++;byStrat[st].p+=t.pnl||0;if(t.pnl>0)byStrat[st].w++});
   const stratItems=Object.entries(byStrat).sort((a,b)=>b[1].p-a[1].p).map(([name,d])=>{
     const wr=d.t?(d.w/d.t*100):0;
     return`<div class="strat-item"><div><div class="strat-name">${esc(name)}</div><div class="strat-meta">${d.t} trades · ${wr.toFixed(0)}% WR</div></div><div class="strat-pnl" style="color:${d.p>=0?'var(--green)':'var(--red)'}">${f$(d.p)}</div></div>`;
   }).join('');
   
   const sess=[...s.cv].slice(-6).reverse();
-  const sessRows=sess.map(x=>{const ct=trades.filter(t=>dKey(t.date)===x.d).length;return`<div class="sess-row"><span class="sess-d">${fD(x.d)}</span><span class="sess-t">${ct} trade${ct!==1?'s':''}</span><span class="sess-p" style="color:${x.p>=0?'var(--green)':'var(--red)'}">${x.p>=0?'+':''}${f$(x.p)}</span></div>`}).join('');
-  const tapeTrades=[...trades].sort((a,b)=>dKey(a.date).localeCompare(dKey(b.date))).slice(-94);
+  const sessRows=sess.map(x=>{const ct=rngT.filter(t=>dKey(t.date)===x.d).length;return`<div class="sess-row"><span class="sess-d">${fD(x.d)}</span><span class="sess-t">${ct} trade${ct!==1?'s':''}</span><span class="sess-p" style="color:${x.p>=0?'var(--green)':'var(--red)'}">${x.p>=0?'+':''}${f$(x.p)}</span></div>`}).join('');
+  const tapeTrades=[...rngT].sort((a,b)=>dKey(a.date).localeCompare(dKey(b.date))).slice(-94);
   const maxAbs=Math.max(...tapeTrades.map(t=>Math.abs(t.pnl||0)),1);
   const tapeW=tapeTrades.length*6;
   const tapePips=tapeTrades.map((t,i)=>{const v=t.pnl||0;const h=v===0?3:6+Math.sqrt(Math.abs(v)/maxAbs)*16;const x=i*6+1.5;
     if(v>0)return`<rect x="${x}" y="${32-h}" width="3" height="${h}" rx="1.5" fill="var(--green)"${i===tapeTrades.length-1?' stroke="var(--text-primary)" stroke-width="1"':''}/>`;
     if(v<0)return`<rect x="${x}" y="32" width="3" height="${h}" rx="1.5" fill="var(--red)"${i===tapeTrades.length-1?' stroke="var(--text-primary)" stroke-width="1"':''}/>`;
     return`<rect x="${x}" y="30.5" width="3" height="3" rx="1.5" fill="var(--text-muted)"/>`}).join('');
-  const noStratPct=s.tot?(trades.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length/s.tot*100):0;
-  const noStratPnl=trades.filter(t=>!t.strategy||t.strategy==='No Strategy Used').reduce((a,t)=>a+(t.pnl||0),0);
-  el.innerHTML=`
+  const noStratPct=s.tot?(rngT.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length/s.tot*100):0;
+  const noStratPnl=rngT.filter(t=>!t.strategy||t.strategy==='No Strategy Used').reduce((a,t)=>a+(t.pnl||0),0);
+  el.innerHTML=rangeBarHTML()+`
     <div class="dash-top">
     <div class="dash-hero fade-up">
-      <div class="dash-hero-label">Total Net P&L</div>
+      <div class="dash-hero-label">Net P&L · ${rangeLabel()}</div>
       <div class="dash-hero-pnl ${s.np>=0?'positive':'negative'}">${f$(s.np)}</div>
       <div class="dash-hero-sub">
         <div class="dash-hero-stat">Today <strong style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${f$(todayPnl)}</strong></div>
@@ -1232,7 +1272,7 @@ function rDash(el){
         ].map(x=>`<div class="dash-st"><span class="dash-st-v">${x.v}</span><span class="dash-st-k">${x.l}</span></div>`).join('<span class="dash-st-div"></span>')}
       </div>
     </div>
-    ${buildEdgeWidget()}
+    ${buildEdgeWidget(rngT)}
     </div>
     ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
       const at=_allTrades.filter(t=>t.accountId===a.id);
@@ -1294,7 +1334,7 @@ function rDash(el){
       </div>
       <div class="dash-bottom-card fade-up" style="animation-delay:.35s">
         <div class="dash-bottom-title">Strategy Performance</div>
-        ${noStratPct>=30?`<div class="strat-flag">${trades.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length} of ${s.tot} trades (${noStratPct.toFixed(0)}%) have no strategy tagged — <strong>${f$(noStratPnl)}</strong> of P&L is unattributed. Tag setups so Coach can analyze what works.</div>`:''}
+        ${noStratPct>=30?`<div class="strat-flag">${rngT.filter(t=>!t.strategy||t.strategy==='No Strategy Used').length} of ${s.tot} trades (${noStratPct.toFixed(0)}%) have no strategy tagged — <strong>${f$(noStratPnl)}</strong> of P&L is unattributed. Tag setups so Coach can analyze what works.</div>`:''}
         ${stratItems||'<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px">No strategy data yet</div>'}
       </div>
     </div>`;
@@ -2197,8 +2237,8 @@ function getStreakData(){
   return{current:currentStreak,best:bestStreak,last7,dayMap};
 }
 
-function buildEdgeWidget(){
-  const t=(trades||[]).filter(x=>x&&dKey(x.date));
+function buildEdgeWidget(list){
+  const t=(list||trades||[]).filter(x=>x&&dKey(x.date));
   if(t.length<5)return`<div class="edge-card"><div class="edge-title">Your Edge</div><div class="edge-empty">Log ${5-t.length} more trade${5-t.length!==1?'s':''} and your edge breakdown appears here — best day, emotional impact, and what discipline is worth in dollars.</div></div>`;
   const DOWN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const byDow={};
