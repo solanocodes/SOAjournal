@@ -235,6 +235,18 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dash-mid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px}
 .dash-sessions{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;display:flex;flex-direction:column}
 .dash-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.edge-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;display:flex;flex-direction:column;height:100%}
+.edge-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);margin-bottom:12px}
+.edge-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--bg-elevated)}
+.edge-row:last-of-type{border-bottom:0}
+.edge-k{display:flex;flex-direction:column;font-size:12.5px;color:var(--text-secondary);min-width:0}
+.edge-k em{font-style:normal;font-size:10.5px;color:var(--text-muted);margin-top:2px}
+.edge-v{display:flex;flex-direction:column;align-items:flex-end;text-align:right;white-space:nowrap}
+.edge-v b{font-size:15px;font-weight:650;letter-spacing:-.01em;color:var(--text-primary)}
+.edge-v i{font-style:normal;font-size:10.5px;color:var(--text-muted);margin-top:2px}
+.edge-empty{font-size:12px;color:var(--text-muted);line-height:1.6}
+.edge-more{margin-top:auto;padding-top:12px;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;text-align:left}
+.edge-more:hover{color:var(--accent)}
 .dash-minical{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
 .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin-top:10px}
 .mc-h{font-size:9px;color:var(--text-muted);font-weight:600;text-transform:uppercase}
@@ -1220,7 +1232,7 @@ function rDash(el){
         ].map(x=>`<div class="dash-st"><span class="dash-st-v">${x.v}</span><span class="dash-st-k">${x.l}</span></div>`).join('<span class="dash-st-div"></span>')}
       </div>
     </div>
-    ${buildStreakWidget()}
+    ${buildEdgeWidget()}
     </div>
     ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
       const at=_allTrades.filter(t=>t.accountId===a.id);
@@ -2185,6 +2197,34 @@ function getStreakData(){
   return{current:currentStreak,best:bestStreak,last7,dayMap};
 }
 
+function buildEdgeWidget(){
+  const t=(trades||[]).filter(x=>x&&dKey(x.date));
+  if(t.length<5)return`<div class="edge-card"><div class="edge-title">Your Edge</div><div class="edge-empty">Log ${5-t.length} more trade${5-t.length!==1?'s':''} and your edge breakdown appears here — best day, emotional impact, and what discipline is worth in dollars.</div></div>`;
+  const DOWN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const byDow={};
+  t.forEach(x=>{const k=dKey(x.date);const p=k.split('-').map(Number);const w=new Date(p[0],p[1]-1,p[2]).getDay();
+    if(!byDow[w])byDow[w]={p:0,n:0};byDow[w].p+=x.pnl||0;byDow[w].n++});
+  const dows=Object.keys(byDow).map(w=>({w:+w,p:byDow[w].p,n:byDow[w].n})).sort((a,b)=>b.p-a.p);
+  const best=dows[0],worst=dows.length>1?dows[dows.length-1]:null;
+  const avg=a=>a.length?a.reduce((s,x)=>s+(x.pnl||0),0)/a.length:0;
+  const hi=t.filter(x=>(x.emotionRating||5)>=7),lo=t.filter(x=>(x.emotionRating||5)<=5);
+  const rp=(typeof getRiskPlan==='function'?getRiskPlan():{})||{};
+  const cap=parseInt(rp.maxTradesPerDay)||0;
+  let dividend=null;
+  if(cap>0){
+    const sorted=[...t].sort((a,b)=>dKey(a.date).localeCompare(dKey(b.date)));
+    const per={};let kept=0;
+    sorted.forEach(x=>{const k=dKey(x.date);per[k]=(per[k]||0)+1;if(per[k]<=cap)kept+=x.pnl||0});
+    dividend=kept-t.reduce((s,x)=>s+(x.pnl||0),0);
+  }
+  let rows='';
+  if(best)rows+=`<div class="edge-row"><span class="edge-k">Best day<em>${best.n} trade${best.n!==1?'s':''}</em></span><span class="edge-v"><b>${DOWN[best.w]}</b><i style="color:${best.p>=0?'var(--green)':'var(--red)'}">${f$(best.p)}</i></span></div>`;
+  if(worst&&worst.w!==best.w)rows+=`<div class="edge-row"><span class="edge-k">Weakest day<em>${worst.n} trade${worst.n!==1?'s':''}</em></span><span class="edge-v"><b>${DOWN[worst.w]}</b><i style="color:${worst.p>=0?'var(--green)':'var(--red)'}">${f$(worst.p)}</i></span></div>`;
+  if(hi.length>=2&&lo.length>=2)rows+=`<div class="edge-row"><span class="edge-k">Focused vs rushed<em>emotion 7+ vs 5 or less</em></span><span class="edge-v"><b style="color:var(--green)">${f$(avg(hi))}</b><i>vs <span style="color:${avg(lo)>=0?'var(--green)':'var(--red)'}">${f$(avg(lo))}</span> per trade</i></span></div>`;
+  if(dividend!==null&&Math.abs(dividend)>=1)rows+=`<div class="edge-row"><span class="edge-k">Trade-cap dividend<em>if you stopped at ${cap}/day</em></span><span class="edge-v"><b style="color:${dividend>=0?'var(--green)':'var(--red)'}">${dividend>=0?'+':''}${f$(dividend)}</b><i>${dividend>=0?'left on the table':'your extra trades helped'}</i></span></div>`;
+  if(!rows)rows=`<div class="edge-empty">Tag emotions on your trades and set a daily trade limit in Risk Plan to unlock more insight.</div>`;
+  return`<div class="edge-card"><div class="edge-title">Your Edge</div>${rows}<button class="edge-more" onclick="sv('coach')">Ask Delta why →</button></div>`;
+}
 function buildStreakWidget(){
   const s=getStreakData();
   const isActive=s.current>0;
