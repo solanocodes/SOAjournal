@@ -312,6 +312,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-attach{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;flex:none}
 .coach-attach:hover{color:var(--accent);border-color:var(--accent)}
 .coach-attach.rec{color:var(--red);border-color:var(--red);animation:micPulse 1.4s infinite}
+.coach-attach.unsupported{opacity:.35}
+.coach-attach.unsupported:hover{color:var(--text-muted);border-color:var(--border)}
 @keyframes micPulse{0%,100%{opacity:1}50%{opacity:.55}}
 .mi-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--yellow);margin-bottom:8px}
 .mi-clear{font-size:12.5px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:18px}
@@ -1306,7 +1308,7 @@ function rCoach(el){
     <div class="coach-chips" id="coachChips"></div>
     <div id="coachImgPrev" class="coach-imgprev"></div>
     <div class="coach-bar">
-      <button class="coach-attach" id="coachMicBtn" title="Speak your message" onclick="coachToggleMic(this)">
+      <button class="coach-attach${(window.SpeechRecognition||window.webkitSpeechRecognition)?'':' unsupported'}" id="coachMicBtn" title="${(window.SpeechRecognition||window.webkitSpeechRecognition)?'Speak your message':'Voice input needs Chrome, Edge, or Safari — Firefox has not enabled it yet'}" onclick="coachToggleMic(this)">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"/><path d="M3.5 7.5a4.5 4.5 0 009 0M8 12v2.5M5.5 14.5h5"/></svg>
       </button>
       <label class="coach-attach" title="Attach a chart screenshot or document">
@@ -1367,7 +1369,7 @@ function coachGrow(el){el.style.height='auto';el.style.height=Math.min(el.scroll
 let _coachRec=null;
 function coachToggleMic(btn){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){alert('Voice input is not supported in this browser — try Chrome, Edge, or Safari.');return}
+  if(!SR){alert("Voice input isn't available in this browser.\n\nFirefox hasn't enabled speech recognition yet (it's still behind a hidden setting). Open the journal in Chrome, Edge, or Safari to talk your journal — or just type your debrief here, it works exactly the same.");return}
   if(_coachRec){_coachRec.stop();return}
   const inp=document.getElementById('coachInput');
   const base=inp&&inp.value?inp.value.replace(/\s+$/,'')+' ':'';
