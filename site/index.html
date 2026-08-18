@@ -340,7 +340,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-dots i:nth-child(2){animation-delay:.2s}
 .coach-dots i:nth-child(3){animation-delay:.4s}
 @keyframes coachBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}
-@media(max-width:640px){.coach{height:calc(100vh - 210px)}}
+
 
 /* ═══ DAILY JOURNAL ═══ */
 .dj{max-width:800px;margin:0 auto}
@@ -750,6 +750,45 @@ input,select,textarea,button{font-family:inherit;outline:none}
 @media(max-width:820px){.app.active{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;align-items:center;gap:8px;padding:10px 14px;border-right:none;border-bottom:1px solid var(--border)}.side-brand{padding:0 8px 0 0}.side-sub,.side-foot{display:none}.nav{flex-direction:row;overflow-x:auto;flex:1}.nav-btn{width:auto;padding:7px 10px}.nav-btn.active{box-shadow:inset 0 -2px 0 var(--accent);background:transparent}.header{position:static;padding:10px 16px}.main{padding:18px 16px 56px}}
 @media(max-width:768px){.form-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.cal-day{min-height:60px;padding:6px}.card-row{flex-direction:column}.trade-row{gap:10px}.report-grid{grid-template-columns:1fr}.badges-grid{grid-template-columns:repeat(2,1fr)}.rules-grid{grid-template-columns:1fr}}
 @media(max-width:480px){.stats-grid{grid-template-columns:1fr 1fr}.cal-day{min-height:50px;padding:4px}.cal-num{font-size:11px}.cal-pnl{font-size:10px}.cal-cnt{display:none}.login-box{padding:32px 24px}.badges-grid{grid-template-columns:1fr 1fr}.review-trade-summary{flex-direction:column;text-align:center}}
+/* ═══ MOBILE: no clipping + Delta as a text thread ═══ */
+@media(max-width:820px){
+  html,body{overflow-x:hidden;max-width:100vw}
+  .app.active{max-width:100vw}
+  .maincol,.main,.header{min-width:0;max-width:100vw}
+  .side{min-width:0;max-width:100vw;overflow:hidden}
+  .nav{min-width:0}
+  .coach-input{min-width:0;min-height:38px}
+  .coach-msgs{min-width:0}
+  .header{flex-wrap:wrap;gap:8px;padding:10px 14px;align-items:center}
+  .header>div:first-child{min-width:0;flex:1}
+  .page-title{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .header-right{gap:6px;flex-wrap:wrap}
+  .header-right .btn-sm,.header-right .btn-import,.header-right .btn-mentor-report,.header-right .btn-primary{padding:6px 10px;font-size:12px}
+  .acct-switch{max-width:130px;font-size:12px}
+  .main{padding:12px 12px 32px}
+  .dash-top,.dash-mid,.cols{grid-template-columns:1fr}
+
+  /* Delta: full-bleed conversation */
+  .coach{height:calc(100dvh - 132px);min-height:0;margin:0 -12px;border-left:0;border-right:0;border-radius:0;background:transparent}
+  .coach-msgs{padding:14px 12px;gap:10px}
+  .coach-msg{max-width:100%}
+  .coach-bubble{max-width:86%;font-size:14.5px;line-height:1.5;padding:10px 13px;border-radius:17px;word-break:break-word;overflow-wrap:anywhere}
+  .coach-msg.ai .coach-bubble{border-bottom-left-radius:5px}
+  .coach-msg.me .coach-bubble{background:var(--accent);border-color:transparent;color:#0d1410;border-bottom-right-radius:5px}
+  .coach-msg.me .coach-bubble strong{color:#0d1410}
+  .coach-msg-img{max-width:190px;max-height:150px}
+  .coach-chips{padding:0 12px 8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .coach-chips::-webkit-scrollbar{display:none}
+  .coach-chip{white-space:nowrap;flex:none}
+  .coach-imgprev{padding:0 12px}
+  .coach-bar{position:sticky;bottom:0;z-index:5;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg-deep);border-top:1px solid var(--border)}
+  .coach-input{font-size:16px;max-height:130px}
+  .coach-bar .btn-primary{padding:8px 14px;font-size:13px}
+}
+@media(max-width:480px){
+  .coach-bubble{max-width:90%}
+  .header-right .btn-mentor-report{display:none}
+}
 </style>
 </head>
 <body>
@@ -1315,7 +1354,7 @@ function rCoach(el){
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 7.5l-5.2 5.2a3.3 3.3 0 01-4.7-4.7l6-6a2.2 2.2 0 013.1 3.1l-6 6a1.1 1.1 0 01-1.6-1.6l5.2-5.2"/></svg>
         <input type="file" accept="image/*,.docx,.txt,.md" style="display:none" onchange="coachPickImg(this)">
       </label>
-      <textarea id="coachInput" class="coach-input" rows="1" placeholder="Ask Delta anything — or drop a chart screenshot or notes document (.docx)" oninput="coachGrow(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
+      <textarea id="coachInput" class="coach-input" rows="1" placeholder="${window.innerWidth<=640?'Message Delta…':'Ask Delta anything — or drop a chart screenshot or notes document (.docx)'}" oninput="coachGrow(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea>
       <button class="btn-primary" onclick="sendCoach()" id="coachSendBtn">Send</button>
     </div>
   </div>`;
