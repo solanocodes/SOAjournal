@@ -587,10 +587,14 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
 
     prompt += `\nGive your analysis in HTML format with <h4> section headers. Be specific to THIS trader's data.`;
 
+    const pbA = await getPlaybook();
+    const sysA = [{ type: 'text', text: AI_SYSTEM_PROMPT }];
+    if (pbA) sysA.push({ type: 'text', text: '=== SOA PLAYBOOK (the mentor\'s system — analyze against this) ===\n' + pbA.text });
+    sysA[sysA.length - 1].cache_control = { type: 'ephemeral' };
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 800,
-      system: AI_SYSTEM_PROMPT,
+      system: sysA,
       messages: [{ role: 'user', content: prompt }]
     });
 
@@ -599,6 +603,50 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('AI analysis error:', err);
     res.status(500).json({ error: 'AI analysis failed' });
+  }
+});
+
+// ═══════════════════════════════════
+// SOA PLAYBOOK (shared coaching IP)
+// ═══════════════════════════════════
+
+async function getPlaybook() {
+  try {
+    const r = await pool.query("SELECT value FROM app_state WHERE key = 'soa_playbook'");
+    if (!r.rows.length) return null;
+    const p = JSON.parse(r.rows[0].value);
+    return p && p.text ? p : null;
+  } catch (e) { return null; }
+}
+
+app.get('/api/playbook', authMiddleware, async (req, res) => {
+  try {
+    const p = await getPlaybook();
+    if (!p) return res.json({ text: '', updatedAt: null, source: '', chars: 0 });
+    // Students only need to know it exists; mentors get the full text to edit.
+    if (!req.user.is_mentor) return res.json({ text: '', updatedAt: p.updatedAt, source: p.source, chars: p.text.length });
+    res.json({ text: p.text, updatedAt: p.updatedAt, source: p.source, chars: p.text.length });
+  } catch (err) { console.error('API error [GET /api/playbook]:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/playbook', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    let text = String(req.body.text || '');
+    let source = String(req.body.source || 'pasted');
+    if (req.body.doc && req.body.doc.data) {
+      const buf = Buffer.from(String(req.body.doc.data).replace(/^data:[^;]+;base64,/, ''), 'base64');
+      if (buf.length > 8 * 1024 * 1024) return res.status(400).json({ error: 'Document too large (max 8MB)' });
+      const nm = String(req.body.doc.name || 'document');
+      text = /\.docx$/i.test(nm) ? docxToText(buf) : buf.toString('utf8');
+      source = nm;
+    }
+    text = text.slice(0, 60000).trim();
+    const payload = JSON.stringify({ text, updatedAt: new Date().toISOString(), source });
+    await pool.query("INSERT INTO app_state (key, value) VALUES ('soa_playbook', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [payload]);
+    res.json({ success: true, chars: text.length });
+  } catch (err) {
+    console.error('API error [POST /api/playbook]:', err.message);
+    res.status(400).json({ error: 'Could not read that document — is it a valid .docx or text file?' });
   }
 });
 
@@ -628,6 +676,8 @@ You have tools that query the trader's REAL data. Rules for you:
 - Use remember(kind, content) to save durable facts the trader tells you or commits to. kinds: profile (who they are, account situation), playbook (their entry model / trading rules), commitment (things they commit to doing), flag (patterns you have flagged), question (open questions like withdrawal timing). Save conclusions, not chit-chat. Keep each memory under 200 characters.
 - When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
 - If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
+
+SOA PLAYBOOK: if a playbook block is provided below, it is the mentor's own written trading system — the exact method these traders paid to learn. Treat it as authoritative. Judge every setup, entry, and rule break against it specifically (its criteria, its language, its thresholds) rather than generic trading advice, and quote its terminology back to the trader. When their behaviour contradicts it, say which part of the system they broke. If the trader asks something the playbook does not cover, answer from general SOA principles and say you are going beyond the written system.
 
 DOCUMENTS: when the trader attaches a document, it is teach-the-coach material — usually their trading notes, entry model write-up, or summaries of past coaching conversations. Read it fully, extract every durable fact (entry model rules, risk/withdrawal plans, goals, known patterns and struggles, commitments), and save them with remember() using the right kind — batch ALL your remember() calls into a single response rather than one at a time. Then reply with a short bullet summary of what you learned and stored — do not quote the document back at length. If it conflicts with what you already know, ask about the conflict.
 
@@ -863,10 +913,11 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
     let reply = '';
     const emit = (d) => { reply += d; res.write(d); };
-    const sys = [
-      { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: dyn }
-    ];
+    const pb = await getPlaybook();
+    const sys = [{ type: 'text', text: COACH_SYSTEM }];
+    if (pb) sys.push({ type: 'text', text: '=== SOA PLAYBOOK (the mentor\'s system — coach against this) ===\n' + pb.text });
+    sys[sys.length - 1].cache_control = { type: 'ephemeral' };
+    sys.push({ type: 'text', text: dyn });
     let finished = false;
     for (let i = 0; i < 10; i++) {
       const stream = anthropic.messages.stream({

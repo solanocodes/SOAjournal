@@ -1149,7 +1149,7 @@ function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Cal
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){curAccount=v?parseInt(v):null;localStorage.setItem('soa_acct',v||'');trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;ren()}
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function')setTimeout(loadMentorInsights,0)}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<0);const wr=tr.length?w.length/tr.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length,sk,ar,avgEmo,em,st,cv}}
@@ -1547,7 +1547,7 @@ function rReport(el){const{s:st,e:en}=wRange(repOff);const wt=trades.filter(t=>{
 function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div class="empty-icon">🔒</div><h3 class="empty-title">Mentor access only</h3></div>';return}
   if(!_studentsLoaded){el.innerHTML='<div class="empty-state fade-up"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading students...</h3></div>';api('GET','/api/mentor/students').then(data=>{_cachedStudents=data||[];_studentsLoaded=true;ren()}).catch(err=>{console.error(err);el.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><h3 class="empty-title">Failed to load students</h3></div>'});return}
   if(!_cachedStudents.length){el.innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">👥</div><h3 class="empty-title">No students yet</h3></div>`;return}
-  let h='<h3 style="font-size:18px;font-weight:700;margin-bottom:20px" class="fade-up">★ Mentor Panel</h3><div id="mentorInsights"></div><div class="mentor-student-list">';
+  let h='<h3 style="font-size:18px;font-weight:700;margin-bottom:20px" class="fade-up">★ Mentor Panel</h3><div class="card" id="pbBox" style="margin-bottom:18px"><div style="font-size:15px;font-weight:700;margin-bottom:4px">SOA Playbook</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.6">Your written system, taught to <strong style="color:var(--text-secondary)">every student&rsquo;s Delta</strong>. Delta judges their setups, entries, and rule breaks against this instead of generic trading advice &mdash; and uses your terminology back at them.</div><textarea id="pbText" class="dj-textarea" style="min-height:150px;font-size:12.5px" placeholder="Paste your SOA system here: entry criteria, setup definitions, rules, size guidance, when not to trade"></textarea><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn-primary" onclick="savePlaybook()">Save playbook</button><label class="btn-sm" style="cursor:pointer">Upload .docx<input type="file" accept=".docx,.txt,.md" style="display:none" onchange="pbUpload(this)"></label><span id="pbMsg" style="font-size:12px;color:var(--text-muted)"></span></div><div id="pbMeta" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div></div><div id="mentorInsights"></div><div class="mentor-student-list">';
   _cachedStudents.forEach((s,i)=>{const isV=mViewUser===s.username;h+=`<div class="mentor-student-row${isV?' active':''} fade-up stagger-${Math.min(i+1,8)}" onclick="mViewUser=mViewUser==='${s.username}'?null:'${s.username}';if(mViewUser)loadStuDetail('${s.id}','${s.username}');ren()"><div><div class="mentor-student-name">${esc(s.fullName)}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">@${esc(s.username)}</div></div><div class="mentor-student-stats"><span>${s.tradeCount} trades</span>${s.tradeCount>0?`<span style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'}">${f$(s.totalPnl)}</span><span>${s.winRate.toFixed(0)}% WR</span><span>${s.avgEmotion.toFixed(1)} emo</span>`:'<span style="color:var(--text-muted)">No trades yet</span>'}</div></div>`;
     if(isV){
       const det=_cachedStudentDetail[s.username];
@@ -1608,6 +1608,26 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
   el.innerHTML=h}
 let _mentorInsights=null;
 function postRollCallNow(){if(!confirm('Post the journal roll call to Discord right now?'))return;api('POST','/api/mentor/rollcall').then(d=>alert('Posted — '+d.journaled+' of '+d.of+' journaled today')).catch(e=>alert(e.message))}
+function loadPlaybook(){
+  const el=document.getElementById('pbBox');if(!el)return;
+  api('GET','/api/playbook').then(p=>{
+    const ta=document.getElementById('pbText');if(ta)ta.value=p.text||'';
+    const meta=document.getElementById('pbMeta');
+    if(meta)meta.textContent=p.chars?`${p.chars.toLocaleString()} characters · from ${p.source||'paste'} · updated ${fD(p.updatedAt)}`:'No playbook loaded yet — Delta is coaching from general SOA principles.';
+  }).catch(()=>{});
+}
+function savePlaybook(){
+  const ta=document.getElementById('pbText');const msg=document.getElementById('pbMsg');
+  msg.textContent='Saving…';
+  api('POST','/api/playbook',{text:ta.value,source:'pasted'}).then(d=>{msg.textContent='Saved — every students Delta now coaches from this ('+d.chars.toLocaleString()+' characters).';loadPlaybook()}).catch(e=>{msg.textContent=e.message});
+}
+function pbUpload(input){
+  const f=input.files&&input.files[0];if(!f)return;input.value='';
+  const msg=document.getElementById('pbMsg');msg.textContent='Reading '+f.name+'…';
+  const r=new FileReader();
+  r.onload=e=>{api('POST','/api/playbook',{doc:{name:f.name,data:e.target.result}}).then(d=>{msg.textContent='Loaded '+f.name+' — '+d.chars.toLocaleString()+' characters now taught to every students Delta.';loadPlaybook()}).catch(err=>{msg.textContent=err.message})};
+  r.readAsDataURL(f);
+}
 function loadMentorInsights(){
   const el=document.getElementById('mentorInsights');if(!el)return;
   const btn='<div style="margin-bottom:10px"><button class="btn-sm" onclick="postRollCallNow()">Post roll call to Discord now</button></div>';
