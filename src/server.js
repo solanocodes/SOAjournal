@@ -681,11 +681,11 @@ SOA PLAYBOOK: if a playbook block is provided below, it is the mentor's own writ
 
 DOCUMENTS: when the trader attaches a document, it is teach-the-coach material — usually their trading notes, entry model write-up, or summaries of past coaching conversations. Read it fully, extract every durable fact (entry model rules, risk/withdrawal plans, goals, known patterns and struggles, commitments), and save them with remember() using the right kind — batch ALL your remember() calls into a single response rather than one at a time. Then reply with a short bullet summary of what you learned and stored — do not quote the document back at length. If it conflicts with what you already know, ask about the conflict.
 
-DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
+DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades for today's date and check get_journal_entries for today and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
 
 INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
 
-DATES: all dates are US Eastern trading days. "Today" is the date given in the trader snapshot below — trust it over any other notion of the current date, and use it when calling save_journal for today's debrief.
+DATES: all dates are US Eastern trading days. The conversation history can span several days and is marked with session dates — never assume the last thing discussed was today. Before saying a journal already exists for today, confirm it with get_journal_entries for today's date rather than relying on the conversation. "Today" is the date given in the trader snapshot below — trust it over any other notion of the current date, and use it when calling save_journal for today's debrief.
 
 Style: direct, specific, mentor voice. Short paragraphs. Plain text with **bold** for emphasis. No emoji, no headers. Under 250 words unless performing a requested audit.`;
 
@@ -858,7 +858,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       "SELECT kind, content, created_at FROM coach_memory WHERE user_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 60", [req.user.id]
     )).rows;
     const hist = (await pool.query(
-      'SELECT role, content FROM coach_messages WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [req.user.id]
+      'SELECT role, content, created_at FROM coach_messages WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [req.user.id]
     )).rows.reverse();
 
     const stats = (await pool.query(
@@ -874,11 +874,29 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       ? 'Your memory of this trader:\n' + memRows.map(m => `- [${m.kind}] ${m.content} (${String(m.created_at).slice(0,10)})`).join('\n')
       : 'Your memory of this trader is EMPTY — run the intake interview.';
 
+    const etDay = (d) => {
+      const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' });
+      return f.format(new Date(d));
+    };
+    const todayKey = etTodayStr();
+    const etKey = (d) => {
+      const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
+        .formatToParts(new Date(d)).reduce((a, x) => (a[x.type] = x.value, a), {});
+      return `${p.year}-${p.month}-${p.day}`;
+    };
     const messages = [];
+    let lastKey = null;
     for (const h of hist) {
-      if (messages.length && messages[messages.length-1].role === h.role) messages[messages.length-1].content += '\n' + h.content;
-      else messages.push({ role: h.role, content: h.content });
+      const k = h.created_at ? etKey(h.created_at) : todayKey;
+      let text = h.content;
+      if (k !== lastKey) {
+        text = `[${k === todayKey ? 'Today, ' + etDay(h.created_at || new Date()) : 'Earlier session — ' + etDay(h.created_at)}]\n` + text;
+        lastKey = k;
+      }
+      if (messages.length && messages[messages.length-1].role === h.role) messages[messages.length-1].content += '\n' + text;
+      else messages.push({ role: h.role, content: text });
     }
+    if (lastKey && lastKey !== todayKey) messages.push({ role: 'user', content: `[New session — today is ${todayKey}. Everything above happened on an earlier day.]` });
     let userText = message || (doc ? 'I\'ve attached a document for you to learn from.' : 'Please analyze this chart screenshot.');
     let docNote = '';
     if (doc && doc.data) {
