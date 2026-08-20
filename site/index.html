@@ -1009,7 +1009,7 @@ async function loadAllData(){
 const MENTOR='seansolano';
 const OT=['SPY','QQQ','AAPL','TSLA','AMZN','NVDA','META','MSFT','AMD','GOOG'];
 const FT=['ES','NQ','MES','MNQ','YM','CL','GC','RTY'];
-const STRATEGIES=['SOA Levels','Fibonacci Golden Pocket','TFC','Orderblocks','No Strategy Used'];
+const STRATEGIES=['SOA Levels','Fibonacci Golden Pocket','GP Cluster','TFC','Orderblocks','No Strategy Used'];
 const RL=['Followed max loss per trade','Followed max loss per day','Waited for confirmation candle','Traded at key level / liquidity zone','Proper position sizing','Did not resize mid-trade','Stopped at trade limit','Followed stop loss plan'];
 const EMOTION_LABELS={1:'Terrible — full tilt',2:'Very bad',3:'Bad — emotional',4:'Below average',5:'Neutral',6:'Slightly focused',7:'Focused',8:'Very focused',9:'Dialed in',10:'Peak discipline'};
 const BD=[
@@ -2496,7 +2496,7 @@ function generateDailyAI(dayTrades,dj){
   Object.entries(strats).forEach(([name,d])=>{
     const swr=d.c?(d.w/d.c*100):0;
     if(name==='No Strategy Used'||name==='No Strategy'){
-      h+=`\n<strong style="color:#d99c85">⚠️ ${d.c} trade${d.c>1?'s':''} with no SOA strategy.</strong> In the SOA system, every trade needs a defined setup — SOA Levels, Fibonacci Golden Pocket, TFC, or Orderblocks. Random entries destroy consistency.`;
+      h+=`\n<strong style="color:#d99c85">⚠️ ${d.c} trade${d.c>1?'s':''} with no SOA strategy.</strong> In the SOA system, every trade needs a defined setup — SOA Levels, Fibonacci Golden Pocket, GP Cluster, TFC, or Orderblocks. Random entries destroy consistency.`;
     }else{
       h+=`\n<strong>${name}</strong>: ${d.c} trade${d.c>1?'s':''}, ${swr.toFixed(0)}% WR, ${f$(d.p)} — ${d.p>=0?'working well today':'underperformed, review the setups'}.`;
     }
