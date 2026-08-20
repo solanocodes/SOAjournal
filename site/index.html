@@ -693,6 +693,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .import-dropzone-icon{font-size:42px;margin-bottom:12px;display:block}
 .import-dropzone-text{font-size:15px;font-weight:600;margin-bottom:4px}
 .import-dropzone-sub{font-size:12px;color:var(--text-muted)}
+.rv-acct{font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.03em}
+.copy-badge{background:var(--bg-elevated);border:1px solid rgba(111,176,131,.4);color:var(--accent);border-radius:8px;padding:7px 12px;font-size:12px;margin-bottom:12px}
 .imp-accts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .imp-acct{display:flex;flex-direction:column;gap:2px;background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:150px}
 .imp-acct.ok{border-color:rgba(111,176,131,.45)}
@@ -3467,9 +3469,37 @@ reviewData=pendingImports.filter(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.di
 if(!reviewData.length){document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">⚠️</div><h3 class="empty-title">All ${dupCount} trade${dupCount!==1?'s':''} are duplicates</h3><p class="empty-text">These trades are already in your journal. No new trades to import.</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport()">Done</button>`;return}
 if(dupCount>0){const status=document.getElementById('importStatus');if(status)status.innerHTML=`<div class="import-status" style="background:rgba(234,179,8,0.1);color:var(--yellow);border-color:var(--yellow)">⚠️ ${dupCount} duplicate${dupCount!==1?'s':''} already in your journal — skipped. Reviewing ${reviewData.length} new trade${reviewData.length!==1?'s':''}.</div>`}
 reviewIndex=0;showReviewSlide()}
-function showReviewSlide(){const t=reviewData[reviewIndex];const total=reviewData.length;const pct=((reviewIndex)/total*100).toFixed(0);document.getElementById('importModalTitle').textContent=`Review Trade ${reviewIndex+1} of ${total}`;const emoVal=t.emotionRating||7;const body=document.getElementById('importBody');
+function copyGroupIdx(i){
+  const t=reviewData[i];if(!t||!t.brokerAccount)return[];
+  const out=[];
+  reviewData.forEach((x,j)=>{
+    if(j===i||x._autoTagged)return;
+    if(x.brokerAccount&&String(x.brokerAccount)!==String(t.brokerAccount)&&x.date===t.date&&x.product===t.product&&x.direction===t.direction&&x.entryPrice===t.entryPrice)out.push(j);
+  });
+  return out;
+}
+function applyToCopies(){
+  saveCurrentReview();
+  const t=reviewData[reviewIndex];const g=copyGroupIdx(reviewIndex);
+  g.forEach(j=>{const c=reviewData[j];
+    c.strategies=[...(t.strategies||[])];c.emotionRating=t.emotionRating;
+    c.rulesFollowed=[...(t.rulesFollowed||[])];c.notes=t.notes||'';c._autoTagged=true});
+  revNext();
+}
+function revNext(){
+  saveCurrentReview();
+  let i=reviewIndex+1;while(i<reviewData.length&&reviewData[i]._autoTagged)i++;
+  if(i>=reviewData.length){finishImport();return}
+  reviewIndex=i;showReviewSlide();
+}
+function revBack(){
+  saveCurrentReview();
+  let i=reviewIndex-1;while(i>=0&&reviewData[i]._autoTagged)i--;
+  if(i<0)return;reviewIndex=i;showReviewSlide();
+}
+function showReviewSlide(){const t=reviewData[reviewIndex];const total=reviewData.length;const pct=((reviewIndex)/total*100).toFixed(0);const _left=reviewData.filter(x=>!x._autoTagged).length;const _done=reviewData.slice(0,reviewIndex).filter(x=>!x._autoTagged).length;document.getElementById('importModalTitle').textContent=`Review Trade ${_done+1} of ${_left}`+(total>_left?` (${total-_left} tagged as copies)`:'');const emoVal=t.emotionRating||7;const body=document.getElementById('importBody');
 body.innerHTML=`<div class="review-slide"><div class="review-progress"><span class="review-progress-text">${reviewIndex+1}/${total}</span><div class="review-progress-bar"><div class="review-progress-fill" style="width:${pct}%"></div></div><span class="review-progress-text" style="text-align:right">${pct}%</span></div>
-<div class="review-trade-summary"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}" style="width:42px;height:42px;font-size:16px">${t.direction==='Long'?'▲':'▼'}</div><div class="review-trade-info"><h3>${t.product} — ${t.direction}</h3><p>${t.date} · Entry: ${t.entryPrice} → Exit: ${t.exitPrice} · Qty: ${t.quantity}</p></div><div class="review-trade-pnl" style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div></div>
+${(()=>{const g=copyGroupIdx(reviewIndex);const an=acctNameForBroker(t.brokerAccount)||t.brokerAccount;return (an?`<div class="rv-acct">${esc(String(an))}</div>`:"")+(g.length?`<div class="copy-badge">Copy trade &middot; same entry on ${g.length+1} accounts &mdash; tag once and apply to all</div>`:"")})()}<div class="review-trade-summary"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}" style="width:42px;height:42px;font-size:16px">${t.direction==='Long'?'▲':'▼'}</div><div class="review-trade-info"><h3>${t.product} — ${t.direction}</h3><p>${t.date} · Entry: ${t.entryPrice} → Exit: ${t.exitPrice} · Qty: ${t.quantity}</p></div><div class="review-trade-pnl" style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div></div>
 <div class="review-field"><label>What strategies did you use? (select all that apply)</label><div class="chip-row" id="rv-strat-chips">${STRATEGIES.map(s=>'<div class="chip'+((t.strategies||[]).includes(s)?' active':'')+'" onclick="toggleRevStrat('+reviewIndex+',\''+s.replace(/'/g,"\\'")+'\',this)">'+s+'</div>').join('')}</div></div>
 <div class="review-field"><label>How were your emotions? (1 = tilted, 10 = peak discipline)</label><div class="emotion-slider-container"><input type="range" min="1" max="10" value="${emoVal}" class="emotion-slider" id="rv-emo" oninput="updateEmoPreview(this.value,${reviewIndex})"><div><div class="emotion-value" id="rv-emo-val" style="color:${emoColor(emoVal)}">${emoVal}</div><div class="emotion-label" id="rv-emo-label">${emoText(emoVal)}</div></div></div></div>
 <div class="review-field"><label>Rules followed</label><div class="rules-grid">${RL.map((r,i)=>`<div class="rule-item${(t.rulesFollowed||[]).includes(r)?' checked':''}" onclick="toggleRevRule(${reviewIndex},${i},this)"><span class="rule-check">${(t.rulesFollowed||[]).includes(r)?'✓':''}</span><span class="rule-text">${r}</span></div>`).join('')}</div></div>
@@ -3481,7 +3511,8 @@ body.innerHTML=`<div class="review-slide"><div class="review-progress"><span cla
 </div>
 <div class="screenshot-preview" id="rv-screenshot-preview">${(t.screenshots||[]).map((img,si)=>`<div class="screenshot-thumb"><img src="${img}"><button class="screenshot-remove" onclick="event.stopPropagation();removeReviewScreenshot(${reviewIndex},${si})">✕</button></div>`).join('')}</div>
 </div></div>`;
-document.getElementById('importFooter').innerHTML=`<div style="display:flex;justify-content:space-between;width:100%;gap:10px">${reviewIndex>0?`<button class="btn-sm" onclick="saveCurrentReview();reviewIndex--;showReviewSlide()">← Back</button>`:'<button class="btn-sm" onclick="closeImport()">Cancel</button>'}<div style="display:flex;gap:10px">${reviewIndex<total-1?`<button class="btn-primary" onclick="saveCurrentReview();reviewIndex++;showReviewSlide()">Next →</button>`:`<button class="btn-primary" onclick="saveCurrentReview();finishImport()">✓ Finish & Import All</button>`}</div></div>`;
+const _g=copyGroupIdx(reviewIndex);const _more=reviewData.slice(reviewIndex+1).some(x=>!x._autoTagged);
+document.getElementById('importFooter').innerHTML=`<div style="display:flex;justify-content:space-between;width:100%;gap:10px;flex-wrap:wrap">${reviewData.slice(0,reviewIndex).some(x=>!x._autoTagged)?`<button class="btn-sm" onclick="revBack()">← Back</button>`:'<button class="btn-sm" onclick="closeImport()">Cancel</button>'}<div style="display:flex;gap:10px;flex-wrap:wrap">${_g.length?`<button class="btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="applyToCopies()">Apply to ${_g.length} cop${_g.length>1?'ies':'y'} →</button>`:''}${_more?`<button class="btn-primary" onclick="revNext()">Next →</button>`:`<button class="btn-primary" onclick="saveCurrentReview();finishImport()">✓ Finish & Import All</button>`}</div></div>`;
 if(!t.strategy)reviewData[reviewIndex].strategy=STRATEGIES[0]}
 function toggleRevStrat(tradeIdx,strat,el){const t=reviewData[tradeIdx];if(!t.strategies)t.strategies=[];if(t.strategies.includes(strat)){t.strategies=t.strategies.filter(x=>x!==strat);el.classList.remove('active')}else{t.strategies.push(strat);el.classList.add('active')}}
 function updateEmoPreview(val,idx){val=parseInt(val);reviewData[idx].emotionRating=val;document.getElementById('rv-emo-val').textContent=val;document.getElementById('rv-emo-val').style.color=emoColor(val);document.getElementById('rv-emo-label').textContent=emoText(val)}
