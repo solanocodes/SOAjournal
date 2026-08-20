@@ -685,6 +685,8 @@ DAILY DEBRIEF: this is how the trader journals. When they want to talk about the
 
 INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
 
+DATES: all dates are US Eastern trading days. "Today" is the date given in the trader snapshot below — trust it over any other notion of the current date, and use it when calling save_journal for today's debrief.
+
 Style: direct, specific, mentor voice. Short paragraphs. Plain text with **bold** for emphasis. No emoji, no headers. Under 250 words unless performing a requested audit.`;
 
 const COACH_TOOLS = [
@@ -867,7 +869,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     )).rows[0];
 
     let dyn = `Trader snapshot: ${stats.n} trades, net P&L $${parseFloat(stats.pnl).toFixed(2)}, ` +
-      `${stats.n ? (stats.wins / stats.n * 100).toFixed(1) : 0}% win rate, ${stats.untagged} untagged trades. Today: ${new Date().toISOString().slice(0,10)}.\n`;
+      `${stats.n ? (stats.wins / stats.n * 100).toFixed(1) : 0}% win rate, ${stats.untagged} untagged trades. Today: ${etTodayStr()} (${etParts().weekday}, US Eastern trading day).\n`;
     dyn += memRows.length
       ? 'Your memory of this trader:\n' + memRows.map(m => `- [${m.kind}] ${m.content} (${String(m.created_at).slice(0,10)})`).join('\n')
       : 'Your memory of this trader is EMPTY — run the intake interview.';
@@ -1172,6 +1174,7 @@ app.post('/api/accounts/:id/sync', authMiddleware, async (req, res) => {
 // DISCORD ROLL CALL
 // ═══════════════════════════════════
 
+function etTodayStr(){const p=etParts();return `${p.year}-${p.month}-${p.day}`}
 function etParts() {
   const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23',
     weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
