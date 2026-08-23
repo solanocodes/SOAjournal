@@ -181,6 +181,10 @@ const initDB = async () => {
       -- Account link on trades (added later, safe to re-run)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS account_id INTEGER;
 
+      -- Manual day entries: a day recorded without executions (blown account, missing export)
+      ALTER TABLE trades ADD COLUMN IF NOT EXISTS manual_day BOOLEAN DEFAULT FALSE;
+      ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_count INTEGER;
+
       -- Normalize legacy M/D/YY and MM/DD/YYYY trade dates to ISO (idempotent)
       UPDATE trades SET date = to_char(
         to_date(date, CASE WHEN date ~ '/[0-9]{4}$' THEN 'FMMM/FMDD/YYYY' ELSE 'FMMM/FMDD/YY' END),
