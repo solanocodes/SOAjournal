@@ -901,7 +901,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
         <select id="importBroker" style="background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text-primary);font-size:14px;width:100%">
           <option value="tradovate">Tradovate</option>
           <option value="topstepx">TopStepX</option>
-          <option value="webull">Webull</option>
+          <option value="webull">Webull</option><option value="tvpaper">TradingView (paper)</option>
         </select>
       </div>
       <div class="import-steps" id="importInstructions">
@@ -3153,9 +3153,9 @@ function rAplusLibrary(el){
 }
 
 // ═══ CSV IMPORT + REVIEW SLIDESHOW ═══
-function openImport(){pendingImports=[];reviewData=[];reviewIndex=0;document.getElementById('importModalTitle').textContent='Import Trades';document.getElementById('importBody').innerHTML=`<div class="field" style="margin-bottom:16px"><label style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em">Select your broker</label><select id="importBroker" onchange="updateBrokerInstructions()" style="background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text-primary);font-size:14px;width:100%"><option value="tradovate">Tradovate</option><option value="topstepx">TopStepX</option><option value="webull">Webull</option></select></div><div class="import-steps" id="importInstructions"><strong>How to export from Tradovate:</strong><br>1. Open Tradovate → click gear icon next to your account<br>2. Go to the <strong>Orders</strong> tab (not Performance)<br>3. Select date range → click <strong>Download Report</strong><br>4. Upload that CSV file here</div><div id="importDropzone" class="import-dropzone" style="margin-top:16px" onclick="document.getElementById('importFileInput').click()"><span class="import-dropzone-icon">📂</span><div class="import-dropzone-text">Drop your CSV files here</div><div class="import-dropzone-sub">one per account is fine — select them all at once</div></div><input type="file" id="importFileInput" class="import-file-input" accept=".csv" multiple onchange="handleImportFiles(this.files)"><div id="importPreview"></div><div id="importStatus"></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-sm" onclick="closeImport()">Cancel</button><button class="btn-primary" id="btnImportConfirm" onclick="startReview()" style="display:none">Review Trades →</button>`;document.getElementById('importModal').classList.add('active');setTimeout(setupDZ,100)}
+function openImport(){pendingImports=[];reviewData=[];reviewIndex=0;document.getElementById('importModalTitle').textContent='Import Trades';document.getElementById('importBody').innerHTML=`<div class="field" style="margin-bottom:16px"><label style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em">Select your broker</label><select id="importBroker" onchange="updateBrokerInstructions()" style="background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text-primary);font-size:14px;width:100%"><option value="tradovate">Tradovate</option><option value="topstepx">TopStepX</option><option value="webull">Webull</option><option value="tvpaper">TradingView (paper)</option></select></div><div class="import-steps" id="importInstructions"><strong>How to export from Tradovate:</strong><br>1. Open Tradovate → click gear icon next to your account<br>2. Go to the <strong>Orders</strong> tab (not Performance)<br>3. Select date range → click <strong>Download Report</strong><br>4. Upload that CSV file here</div><div id="importDropzone" class="import-dropzone" style="margin-top:16px" onclick="document.getElementById('importFileInput').click()"><span class="import-dropzone-icon">📂</span><div class="import-dropzone-text">Drop your CSV files here</div><div class="import-dropzone-sub">one per account is fine — select them all at once</div></div><input type="file" id="importFileInput" class="import-file-input" accept=".csv" multiple onchange="handleImportFiles(this.files)"><div id="importPreview"></div><div id="importStatus"></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-sm" onclick="closeImport()">Cancel</button><button class="btn-primary" id="btnImportConfirm" onclick="startReview()" style="display:none">Review Trades →</button>`;document.getElementById('importModal').classList.add('active');setTimeout(setupDZ,100)}
 function closeImport(){document.getElementById('importModal').classList.remove('active')}
-function updateBrokerInstructions(){const el=document.getElementById('importInstructions');const v=document.getElementById('importBroker').value;if(v==='topstepx')el.innerHTML='<strong>How to export from TopStepX:</strong><br>1. Go to your TopStepX dashboard<br>2. Navigate to <strong>Orders</strong> or <strong>Trade History</strong><br>3. Click <strong>Export</strong> to download your CSV<br>4. Upload that file here';else if(v==='webull')el.innerHTML='<strong>How to export from Webull:</strong><br>1. Open the <strong>Webull mobile app</strong><br>2. Go to <strong>Account → History → Order Records</strong><br>3. Filter to <strong>Fully Filled</strong> orders<br>4. Tap the <strong>download icon</strong> (top right)<br>5. Check your email for the CSV file<br>6. Upload the <strong>Webull_Orders_Records.csv</strong> file here';else el.innerHTML='<strong>How to export from Tradovate:</strong><br>1. Open Tradovate → click gear icon next to your account<br>2. Go to the <strong>Orders</strong> tab (not Performance)<br>3. Select date range → click <strong>Download Report</strong><br>4. Upload that CSV file here'}
+function updateBrokerInstructions(){const el=document.getElementById('importInstructions');const v=document.getElementById('importBroker').value;if(v==='topstepx')el.innerHTML='<strong>How to export from TopStepX:</strong><br>1. Go to your TopStepX dashboard<br>2. Navigate to <strong>Orders</strong> or <strong>Trade History</strong><br>3. Click <strong>Export</strong> to download your CSV<br>4. Upload that file here';else if(v==='webull')el.innerHTML='<strong>How to export from Webull:</strong><br>1. Open the <strong>Webull mobile app</strong><br>2. Go to <strong>Account → History → Order Records</strong><br>3. Filter to <strong>Fully Filled</strong> orders<br>4. Tap the <strong>download icon</strong> (top right)<br>5. Check your email for the CSV file<br>6. Upload the <strong>Webull_Orders_Records.csv</strong> file here';else if(v==='tvpaper')el.innerHTML='<strong>How to export from TradingView paper trading:</strong><br>1. Open the <strong>Trading Panel</strong> at the bottom of the chart<br>2. Go to the <strong>History</strong> or <strong>Orders</strong> tab<br>3. Click the <strong>download icon</strong> to export CSV<br>4. Upload that file here';else el.innerHTML='<strong>How to export from Tradovate:</strong><br>1. Open Tradovate → click gear icon next to your account<br>2. Go to the <strong>Orders</strong> tab (not Performance)<br>3. Select date range → click <strong>Download Report</strong><br>4. Upload that CSV file here'}
 function setupDZ(){const dz=document.getElementById('importDropzone');if(!dz)return;dz.ondragover=e=>{e.preventDefault();dz.classList.add('dragover')};dz.ondragleave=e=>{e.preventDefault();dz.classList.remove('dragover')};dz.ondrop=e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files.length)handleImportFiles(e.dataTransfer.files)}}
 function parseCSV(text){const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2)return[];function split(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"')q=!q;else if(ch===','&&!q){r.push(c.trim());c=''}else c+=ch}r.push(c.trim());return r}const hd=split(lines[0]).map(h=>h.replace(/"/g,'').trim());return lines.slice(1).map(l=>{const v=split(l);const row={};hd.forEach((h,i)=>{row[h]=v[i]||''});return row})}
 function getProductFromContract(contract){
@@ -3387,6 +3387,53 @@ function parseWebull(rows){
   return rts;
 }
 
+function tvProduct(sym){
+  let x=String(sym||'').split(':').pop().trim().toUpperCase();
+  x=x.replace(/[12]!$/,'');
+  x=x.replace(/[FGHJKMNQUVXZ]\d{1,4}$/,'');
+  return x;
+}
+function parseTradingView(rows){
+  const filled=rows.filter(r=>String(r['Status']||'').trim().toLowerCase()==='filled'&&(r['Fill price']||'').toString().trim()!=='');
+  if(!filled.length)return[];
+  filled.sort((a,b)=>String(a['Placing time']||'').localeCompare(String(b['Placing time']||'')));
+  const byP={};
+  filled.forEach(r=>{const pr=tvProduct(r['Symbol']);if(!byP[pr])byP[pr]=[];byP[pr].push(r)});
+  const rts=[];
+  Object.entries(byP).forEach(([product,orders])=>{
+    let pos=0,entries=[];
+    orders.forEach(o=>{
+      const qty=parseInt(o['Quantity']||'1')||1;
+      const price=parseFloat(String(o['Fill price']).replace(/[^0-9.\-]/g,''))||0;
+      const isBuy=String(o['Side']||'').trim().toLowerCase()==='buy';
+      const signed=isBuy?qty:-qty;
+      const when=String(o['Placing time']||'');
+      const date=normalizeDate(when.split(' ')[0])||when.slice(0,10);
+      if(pos===0){entries=[{qty,price}];pos=signed}
+      else if((pos>0&&!isBuy)||(pos<0&&isBuy)){
+        const closeQty=Math.min(Math.abs(pos),qty);
+        const ep=entries.reduce((a,e)=>a+e.price*e.qty,0)/entries.reduce((a,e)=>a+e.qty,0);
+        const dir=pos>0?'Long':'Short';
+        const isFut=!!TICK_VALUES[product];
+        const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
+        const gross=isFut
+          ?(dir==='Long'?(price-ep):(ep-price))/ts*tv*closeQty
+          :(dir==='Long'?(price-ep):(ep-price))*closeQty;
+        const fee=(isFut?(RT_FEES[product]||2.00):0)*closeQty;
+        rts.push({brokerAccount:'',date,product,contract:String(o['Symbol']||product),direction:dir,
+          entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,
+          grossPnl:Math.round(gross*100)/100,fees:Math.round(fee*100)/100,
+          pnl:Math.round((gross-fee)*100)/100,
+          instrument:isFut?'futures':'options',
+          strategies:[],emotionRating:7,rulesFollowed:[],notes:''});
+        const rem=Math.abs(pos)-closeQty;
+        if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}
+        else pos=pos>0?rem:-rem;
+      } else {entries.push({qty,price});pos+=signed}
+    });
+  });
+  return rts;
+}
 function parseTradovateRows(rows){
 const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length)return[];filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const brokerAccount=o['Account']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({brokerAccount,date:normalizeDate(date.split(' ')[0]||date.split('T')[0])||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});
   return rts;
@@ -3398,7 +3445,9 @@ function detectAndParse(rows,brokerSel){
   const hasBS=h.hasOwnProperty('B/S'),hasContract=h.hasOwnProperty('Contract');
   const hasTopStep=h.hasOwnProperty('PositionDisposition')||(h.hasOwnProperty('ContractName')&&h.hasOwnProperty('Side'))||(h.hasOwnProperty('EntryPrice')&&h.hasOwnProperty('ExitPrice')&&h.hasOwnProperty('PnL'));
   const hasWebull=h.hasOwnProperty('Symbol')&&(h.hasOwnProperty('Side')||h.hasOwnProperty('Action'));
+  const hasTV=h.hasOwnProperty('Fill price')&&h.hasOwnProperty('Placing time');
   try{
+    if(brokerSel==='tvpaper'||hasTV)return{format:'TradingView',rts:parseTradingView(rows)||[]};
     if(brokerSel==='topstepx'||(!hasBS&&hasTopStep))return{format:'TopStepX',rts:parseTopStepX(rows)||[]};
     if(brokerSel==='webull'||(!hasBS&&!hasTopStep&&hasWebull))return{format:'Webull',rts:parseWebull(rows)||[]};
     if(!hasBS&&!hasContract)return{error:'unrecognized format — check the broker setting'};
