@@ -230,6 +230,11 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dash-hero-stat strong{color:var(--text-primary);font-weight:700}
 
 .dash-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px}
+.vbanner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;padding:12px 16px;border-radius:10px;margin-bottom:16px;line-height:1.5}
+.vbanner.err{background:rgba(220,80,80,.10);border:1px solid rgba(220,80,80,.35);color:var(--text-primary)}
+.vbanner.info{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-secondary)}
+.vbanner button{background:transparent;border:1px solid var(--border);color:var(--text-primary);font-size:12px;font-weight:600;padding:5px 12px;border-radius:7px;cursor:pointer}
+.vbanner button:hover{border-color:var(--accent);color:var(--accent)}
 .range-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .range-pills{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:9px;overflow:hidden}
 .range-btn{background:transparent;border:0;color:var(--text-muted);font-size:12.5px;font-weight:500;padding:7px 13px;cursor:pointer;transition:all .15s;white-space:nowrap}
@@ -992,22 +997,37 @@ let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRiskPlan={},
 let _allTrades=[],_accounts=[],curAccount=null;
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
+let _loadError='';
+const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts'];
 async function loadAllData(){
-  try{
-    const [tradeData,journalData,badgeData,milestoneData,riskData,settingsData,acctData]=await Promise.all([
-      api('GET','/api/trades'),api('GET','/api/journals'),api('GET','/api/badges'),
-      api('GET','/api/milestones'),api('GET','/api/riskplan'),api('GET','/api/settings'),
-      api('GET','/api/accounts').catch(()=>[])
-    ]);
-    _allTrades=tradeData||[];_accounts=acctData||[];
-    const savedAcct=parseInt(localStorage.getItem('soa_acct'))||null;
-    curAccount=savedAcct&&_accounts.some(a=>a.id===savedAcct)?savedAcct:null;
-    trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;
-    _cachedJournals=journalData||{};_cachedBadges=badgeData||{};
-    _cachedMilestones=milestoneData||{};
-    _cachedRiskPlan=riskData||{};_cachedSettings=settingsData||{};_dataLoaded=true;
-  }catch(err){console.error('Failed to load data:',err);trades=[];_dataLoaded=true}
+  _loadError='';
+  // Settle each call on its own. One failing endpoint used to reject the whole
+  // Promise.all and blank the journal, which reads exactly like lost data.
+  const res=await Promise.allSettled(LOAD_PATHS.map(p=>api('GET',p)));
+  if(res.some(r=>r.status==='rejected'&&r.reason&&r.reason.message==='Unauthorized'))return;
+  const failed=[];
+  const val=(i,fb)=>{if(res[i].status==='fulfilled')return res[i].value;failed.push(LOAD_PATHS[i]);console.error('Load failed:',LOAD_PATHS[i],res[i].reason);return fb};
+  _allTrades=val(0,[])||[];
+  _cachedJournals=val(1,{})||{};
+  _cachedBadges=val(2,{})||{};
+  _cachedMilestones=val(3,{})||{};
+  _cachedRiskPlan=val(4,{})||{};
+  _cachedSettings=val(5,{})||{};
+  _accounts=val(6,[])||[];
+  applyAcctFilter();
+  _dataLoaded=true;
+  if(failed.length)_loadError=failed.length===LOAD_PATHS.length
+    ?'We could not reach the server just now. Nothing has been deleted — your data is still saved. Try reloading the page.'
+    :'Part of your data did not load ('+failed.map(p=>p.split('/').pop()).join(', ')+'). Nothing has been deleted — try reloading the page.';
 }
+// A saved account filter must never silently hide an entire journal.
+function applyAcctFilter(){
+  const savedAcct=parseInt(localStorage.getItem('soa_acct'))||null;
+  curAccount=savedAcct&&_accounts.some(a=>a.id===savedAcct)?savedAcct:null;
+  if(curAccount&&_allTrades.length&&!_allTrades.some(t=>t.accountId===curAccount)){curAccount=null;localStorage.removeItem('soa_acct')}
+  trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;
+}
+function retryLoad(){loadAllData().then(()=>{refreshFees();bNav();ren()})}
 
 
 const MENTOR='seansolano';
@@ -1145,7 +1165,7 @@ function emoText(r){return EMOTION_LABELS[r]||''}
 function handleLogin(){const u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value,e=document.getElementById('loginError');if(!u||!p){e.textContent='Please fill in all fields';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/login',{username:u,password:p}).then(data=>{authToken=data.token;localStorage.setItem('soa_token',data.token);loginAs(data.user.username,data.user.is_mentor)}).catch(err=>{e.textContent=err.message||'Login failed';e.style.display='block'})}
 function handleRegister(){const fn=document.getElementById('regFirst').value.trim(),ln=document.getElementById('regLast').value.trim(),u=document.getElementById('regUser').value.trim().toLowerCase(),p=document.getElementById('regPass').value,c=document.getElementById('regConfirm').value,sq=document.getElementById('regSecQ').value,sa=document.getElementById('regSecA').value.trim(),e=document.getElementById('regError');if(!fn||!ln||!u||!p||!c||!sq||!sa){e.textContent='Please fill in all fields';e.style.display='block';return}if(u.length<3){e.textContent='Username must be 3+ characters';e.style.display='block';return}if(p.length<4){e.textContent='Password must be 4+ characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/register',{username:u,password:p,firstName:fn,lastName:ln,securityQuestion:sq,securityAnswer:sa}).then(data=>{authToken=data.token;localStorage.setItem('soa_token',data.token);loginAs(data.user.username,data.user.is_mentor)}).catch(err=>{e.textContent=err.message||'Registration failed';e.style.display='block'})}
 function loginAs(u,mentor){curUser=u;isMentor=mentor||false;document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('active');document.getElementById('headerUser').textContent=u;document.getElementById('mentorBadge').style.display=isMentor?'inline':'none';const n=new Date();calY=n.getFullYear();calM=n.getMonth();repOff=0;mViewUser=null;loadAllData().then(()=>{refreshFees();bNav();sv('dashboard');setTimeout(()=>{if(shouldShowWalkthrough())startWalkthrough()},800)}).catch(err=>{console.error(err);bNav();sv('dashboard')})}
-function handleLogout(){curUser=null;authToken=null;localStorage.removeItem('soa_token');_dataLoaded=false;trades=[];_cachedJournals={};_cachedBadges={};_cachedMilestones={};_cachedStudents=[];_studentsLoaded=false;document.getElementById('app').classList.remove('active');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value=''}
+function handleLogout(){curUser=null;authToken=null;localStorage.removeItem('soa_token');localStorage.removeItem('soa_acct');localStorage.removeItem('soa_range');curAccount=null;_allTrades=[];_accounts=[];dashRange={mode:'all'};_loadError='';_dataLoaded=false;trades=[];_cachedJournals={};_cachedBadges={};_cachedMilestones={};_cachedStudents=[];_studentsLoaded=false;document.getElementById('app').classList.remove('active');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value=''}
 function toggleAuth(){const l=document.getElementById('loginForm'),r=document.getElementById('registerForm'),f=document.getElementById('forgotForm');l.style.display=l.style.display!=='none'?'none':'block';r.style.display=l.style.display==='none'&&f.style.display==='none'?'block':'none';f.style.display='none';document.getElementById('loginError').style.display='none';document.getElementById('regError').style.display='none'}
 function toggleForgot(){const l=document.getElementById('loginForm'),f=document.getElementById('forgotForm'),r=document.getElementById('registerForm');const show=f.style.display==='none';l.style.display=show?'none':'block';r.style.display='none';f.style.display=show?'block':'none';document.getElementById('forgotStep1').style.display='block';document.getElementById('forgotStep2').style.display='none';document.getElementById('forgotError').style.display='none'}
 function handleForgotStep1(){const u=document.getElementById('forgotUser').value.trim(),e=document.getElementById('forgotError');if(!u){e.textContent='Enter your username';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/security-question',{username:u}).then(data=>{document.getElementById('forgotQuestion').textContent='Security Question: '+data.question;document.getElementById('forgotStep1').style.display='none';document.getElementById('forgotStep2').style.display='block'}).catch(err=>{e.textContent=err.message||'Account not found';e.style.display='block'})}
@@ -1155,8 +1175,17 @@ function handleForgotStep2(){const u=document.getElementById('forgotUser').value
 function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
-function setAccount(v){curAccount=v?parseInt(v):null;localStorage.setItem('soa_acct',v||'');trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;ren()}
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
+function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
+function viewBanners(){
+  let h='';
+  if(_loadError)h+='<div class="vbanner err">'+esc(_loadError)+' <button onclick="retryLoad()">Retry</button></div>';
+  if(curAccount&&_allTrades.length&&trades.length<_allTrades.length){
+    const nm=(_accounts.find(a=>a.id===curAccount)||{}).name||'one account';
+    h+='<div class="vbanner info">Showing <b>'+trades.length+'</b> of '+_allTrades.length+' trades — filtered to <b>'+esc(nm)+'</b>. <button onclick="setAccount(\'\')">Show all accounts</button></div>';
+  }
+  return h;
+}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const _mdCount=tr.filter(t=>t.manualDay).reduce((a,t)=>a+((parseInt(t.tradeCount)||1)-1),0);const _pt=tr.filter(t=>!t.manualDay);const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=_pt.filter(t=>t.pnl>0),l=_pt.filter(t=>t.pnl<0);const wr=_pt.length?w.length/_pt.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length+_mdCount,sk,ar,avgEmo,em,st,cv}}
