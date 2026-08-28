@@ -18,6 +18,28 @@ app.use(express.static(path.join(__dirname, '..', 'site')));
 // AUTH ROUTES
 // ═══════════════════════════════════
 
+// ═══════════════════════════════════
+// WHAT COUNTS AS JOURNALING
+// ═══════════════════════════════════
+// A trader debriefs in more than one place: the Daily Journal page, a chat with
+// Delta (which writes the same row), or by tagging the trades themselves after an
+// import. All of it counts. What does NOT count is importing a CSV and walking
+// away, so tagged/rated trades are required to carry actual reflection.
+const JOURNALED_DJ = `(satisfaction > 0 OR lessons <> '' OR observations <> '' OR gameplan <> ''
+   OR pm_bias <> '' OR pm_mental_state > 0 OR pm_levels <> '' OR pm_goals <> '')`;
+const JOURNALED_TRADE = `(manual_day = TRUE
+   OR COALESCE(imported_from, '') = ''
+   OR (strategy IS NOT NULL AND strategy <> '' AND strategy <> 'No Strategy Used')
+   OR COALESCE(array_length(rules_followed, 1), 0) > 0
+   OR COALESCE(array_length(screenshots, 1), 0) > 0
+   OR (COALESCE(notes, '') <> '' AND notes NOT LIKE 'Imported \u2014 %'))`;
+// Latest date each of the given users journaled on, by either route.
+const LAST_JOURNAL_SQL = `SELECT user_id, MAX(date) AS last FROM (
+    SELECT user_id, date FROM daily_journals WHERE user_id = ANY($1) AND ${JOURNALED_DJ}
+    UNION ALL
+    SELECT user_id, date FROM trades WHERE user_id = ANY($1) AND ${JOURNALED_TRADE}
+  ) j GROUP BY user_id`;
+
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password, firstName, lastName, securityQuestion, securityAnswer } = req.body;
@@ -389,7 +411,11 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
         (SELECT COALESCE(SUM(t.pnl), 0) FROM trades t WHERE t.user_id = u.id) as total_pnl,
         (SELECT COUNT(*) FROM trades t WHERE t.user_id = u.id AND t.pnl > 0) as wins,
         (SELECT MAX(t.date) FROM trades t WHERE t.user_id = u.id) as last_trade_date,
-        (SELECT MAX(dj.date) FROM daily_journals dj WHERE dj.user_id = u.id AND (dj.satisfaction > 0 OR dj.lessons != '')) as last_journal_date,
+        (SELECT MAX(d) FROM (
+            SELECT dj.date AS d FROM daily_journals dj WHERE dj.user_id = u.id AND ${JOURNALED_DJ}
+            UNION ALL
+            SELECT t.date AS d FROM trades t WHERE t.user_id = u.id AND ${JOURNALED_TRADE}
+          ) jd) as last_journal_date,
         (SELECT AVG(t.emotion_rating) FROM trades t WHERE t.user_id = u.id) as avg_emotion
        FROM users u WHERE u.is_mentor = FALSE ORDER BY u.username`
     );
@@ -456,7 +482,7 @@ app.get('/api/mentor/insights', authMiddleware, mentorOnly, async (req, res) => 
     const [trades, plans, journals, mems, chats] = await Promise.all([
       pool.query('SELECT user_id, date, pnl FROM trades WHERE user_id = ANY($1) AND date >= $2', [ids, since]),
       pool.query('SELECT user_id, max_trades_per_day, max_loss_per_day FROM risk_plans WHERE user_id = ANY($1)', [ids]),
-      pool.query("SELECT user_id, MAX(date) AS last FROM daily_journals WHERE user_id = ANY($1) AND (satisfaction > 0 OR lessons <> '') GROUP BY user_id", [ids]),
+      pool.query(LAST_JOURNAL_SQL, [ids]),
       pool.query("SELECT user_id, kind, content FROM coach_memory WHERE user_id = ANY($1) AND status = 'active' AND kind IN ('commitment','flag') ORDER BY id DESC", [ids]),
       pool.query('SELECT user_id, MAX(created_at) AS last FROM coach_messages WHERE user_id = ANY($1) GROUP BY user_id', [ids])
     ]);
@@ -1210,7 +1236,9 @@ async function postRollCall() {
   const users = (await pool.query('SELECT id, username, first_name FROM users ORDER BY is_mentor DESC, id')).rows;
   if (!users.length) return { error: 'No users yet' };
   const done = (await pool.query(
-    "SELECT DISTINCT user_id FROM daily_journals WHERE date = $1 AND (satisfaction > 0 OR lessons <> '')", [dateKey]
+    `SELECT user_id FROM daily_journals WHERE date = $1 AND ${JOURNALED_DJ}
+     UNION
+     SELECT user_id FROM trades WHERE date = $1 AND ${JOURNALED_TRADE}`, [dateKey]
   )).rows.map(r => r.user_id);
   const journaled = users.filter(u => done.includes(u.id));
   const nm = u => u.first_name || u.username;
