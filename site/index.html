@@ -701,6 +701,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .import-dropzone-text{font-size:15px;font-weight:600;margin-bottom:4px}
 .import-dropzone-sub{font-size:12px;color:var(--text-muted)}
 .rv-acct{font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.03em}
+.scale-badge{background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);border-radius:8px;padding:7px 12px;font-size:12px;margin-bottom:12px}
 .copy-badge{background:var(--bg-elevated);border:1px solid rgba(111,176,131,.4);color:var(--accent);border-radius:8px;padding:7px 12px;font-size:12px;margin-bottom:12px}
 .imp-accts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .imp-acct{display:flex;flex-direction:column;gap:2px;background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:150px}
@@ -3192,6 +3193,49 @@ function getProductFromContract(contract){
   return m?m[1].toUpperCase():contract.replace(/[0-9]+$/,'').toUpperCase();
 }
 
+// ─── ROUND TRIPS ───
+// Fold time-ordered fills into trades. A trade opens when the position leaves
+// flat and closes when it returns to flat, so scaling in and out is ONE trade.
+// Every importer used to emit a separate trade per closing fill, which turned a
+// single position exited in three pieces into "3 trades".
+function foldRoundTrips(fills,o){
+  const out=[];
+  let pos=0,ent=[],ex=[],meta=null;
+  const openWith=f=>{ent=[{qty:f.qty,price:f.price}];ex=[];pos=f.isBuy?f.qty:-f.qty;
+    meta={dir:f.isBuy?'Long':'Short',date:f.date,contract:f.contract,brokerAccount:f.brokerAccount}};
+  const emit=()=>{
+    const eq=ent.reduce((a,e)=>a+e.qty,0),xq=ex.reduce((a,e)=>a+e.qty,0);
+    if(meta&&eq&&xq){
+      const ep=ent.reduce((a,e)=>a+e.price*e.qty,0)/eq;
+      const xp=ex.reduce((a,e)=>a+e.price*e.qty,0)/xq;
+      const gross=o.gross(meta.dir,ep,xp,xq);
+      const fee=o.fee?o.fee(xq):0;
+      out.push({brokerAccount:meta.brokerAccount||'',date:meta.date,
+        product:o.productLabel||o.product,contract:meta.contract||o.product,
+        direction:meta.dir,entryPrice:ep.toFixed(2),exitPrice:xp.toFixed(2),
+        quantity:xq,entryFills:ent.length,exitFills:ex.length,
+        grossPnl:Math.round(gross*100)/100,fees:Math.round(fee*100)/100,
+        pnl:Math.round((gross-fee)*100)/100,instrument:o.instrument,
+        strategies:[],emotionRating:7,rulesFollowed:[],notes:''});
+    }
+    ent=[];ex=[];meta=null;
+  };
+  fills.forEach(f=>{
+    if(!f.qty||!isFinite(f.price))return;
+    if(pos===0){openWith(f);return}
+    if((pos>0&&!f.isBuy)||(pos<0&&f.isBuy)){
+      const closeQty=Math.min(Math.abs(pos),f.qty);
+      ex.push({qty:closeQty,price:f.price});
+      const rem=Math.abs(pos)-closeQty;
+      if(rem>0){pos=pos>0?rem:-rem;return}
+      const left=f.qty-closeQty;   // a fill big enough to close and reverse
+      emit();pos=0;
+      if(left>0)openWith(Object.assign({},f,{qty:left}));
+    }else{ent.push({qty:f.qty,price:f.price});pos+=f.isBuy?f.qty:-f.qty}
+  });
+  return out;   // a position still open at the end is intentionally not emitted
+}
+
 function parseTopStepX(rows){
   // Format A: Pre-computed round-trip trades (newer Topstep export)
   // Columns: Id, ContractName, EnteredAt, ExitedAt, EntryPrice, ExitPrice, Fees, PnL, Size, Type, TradeDay, TradeDuration, Commissions
@@ -3291,29 +3335,17 @@ function parseTopStepX(rows){
       byProduct[product].push(o);
     });
     Object.entries(byProduct).forEach(([product,orders])=>{
-      let pos=0,entries=[];
-      orders.forEach(o=>{
-        const qty=parseInt(o['Size']||'1');
-        const price=parseFloat(o['ExecutePrice']||'0');
-        const isBuy=(o['Side']||'').toLowerCase()==='bid';
-        const signed=isBuy?qty:-qty;
+      const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
+      const fills=orders.map(o=>{
         const tradeDay=o['TradeDay']||o['FilledAt']||'';
-        let date='';const dm=tradeDay.match(/(\d{2})\/(\d{2})\/(\d{4})/);if(dm)date=dm[3]+'-'+dm[1]+'-'+dm[2];
-
-        if(pos===0){entries=[{qty,price,isBuy}];pos=signed}
-        else if((pos>0&&!isBuy)||(pos<0&&isBuy)){
-          const closeQty=Math.min(Math.abs(pos),qty);
-          const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);
-          const dir=pos>0?'Long':'Short';
-          const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
-          let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;
-          const rtFee=(RT_FEES[product]||2.00)*closeQty;
-          rts.push({date,product,contract:o['ContractName']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round((pnl-rtFee)*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});
-          const rem=Math.abs(pos)-closeQty;
-          if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price,isBuy}];pos=isBuy?left:-left}}
-          else pos=pos>0?rem:-rem;
-        }else{entries.push({qty,price,isBuy});pos+=signed}
+        const dm=tradeDay.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        return{qty:parseInt(o['Size']||'1'),price:parseFloat(o['ExecutePrice']||'0'),
+          isBuy:(o['Side']||'').toLowerCase()==='bid',
+          date:dm?dm[3]+'-'+dm[1]+'-'+dm[2]:'',contract:o['ContractName']||product,brokerAccount:''};
       });
+      rts.push(...foldRoundTrips(fills,{product,instrument:'futures',
+        gross:(dir,ep,xp,q)=>(dir==='Long'?xp-ep:ep-xp)/ts*tv*q,
+        fee:q=>(RT_FEES[product]||2.00)*q}));
     });
   }
 
@@ -3354,61 +3386,21 @@ function parseWebull(rows){
   
   const rts=[];
   Object.entries(bySymbol).forEach(([symbol,orders])=>{
-    let pos=0,entries=[];
-    
-    orders.forEach(o=>{
-      const side=(o['Side']||'').toLowerCase();
-      const qty=parseInt(o['Filled']||o['Total Qty']||'1');
-      const priceStr=(o['Avg Price']||o['Price']||'0').replace('@','').trim();
-      const price=parseFloat(priceStr);
-      if(!qty||!price)return;
-      const isBuy=side==='buy';
-      const signed=isBuy?qty:-qty;
-      
-      // Parse date from "03/23/2026 13:22:08 EDT"
+    const opt=parseOptionSym(symbol);
+    const displayName=opt?opt.underlying+' '+opt.strike+(opt.type==='C'?'C':'P'):symbol;
+    const fills=orders.map(o=>{
       const timeStr=o['Filled Time']||o['Placed Time']||'';
-      let date='';
       const dm=timeStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      if(dm)date=dm[3]+'-'+dm[1]+'-'+dm[2];
-      if(!date)date=new Date().toISOString().slice(0,10);
-      
-      if(pos===0){
-        entries=[{qty,price,isBuy}];pos=signed;
-      }else if((pos>0&&!isBuy)||(pos<0&&isBuy)){
-        const closeQty=Math.min(Math.abs(pos),qty);
-        const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);
-        const exitPrice=price;
-        const dir=pos>0?'Long':'Short';
-        
-        // Options P&L: (exit - entry) * qty * 100
-        let pnl=dir==='Long'?(exitPrice-ep)*closeQty*100:(ep-exitPrice)*closeQty*100;
-        
-        // Parse the option symbol for display
-        const opt=parseOptionSym(symbol);
-        const displayName=opt?opt.underlying+' '+opt.strike+(opt.type==='C'?'C':'P'):symbol;
-        const tradeDate=opt?opt.date:date;
-        
-        rts.push({
-          date:date,product:displayName,contract:symbol,direction:dir,
-          entryPrice:ep.toFixed(2),exitPrice:exitPrice.toFixed(2),
-          quantity:closeQty,grossPnl:Math.round(pnl*100)/100,
-          fees:0,pnl:Math.round(pnl*100)/100,
-          instrument:'options',
-          strategies:[],emotionRating:7,rulesFollowed:[],notes:''
-        });
-        
-        const rem=Math.abs(pos)-closeQty;
-        if(rem<=0){
-          pos=0;entries=[];
-          const left=qty-closeQty;
-          if(left>0){entries=[{qty:left,price,isBuy}];pos=isBuy?left:-left}
-        }else{
-          pos=pos>0?rem:-rem;
-        }
-      }else{
-        entries.push({qty,price,isBuy});pos+=signed;
-      }
+      return{qty:parseInt(o['Filled']||o['Total Qty']||'1'),
+        price:parseFloat((o['Avg Price']||o['Price']||'0').replace('@','').trim()),
+        isBuy:(o['Side']||'').toLowerCase()==='buy',
+        date:dm?dm[3]+'-'+dm[1]+'-'+dm[2]:new Date().toISOString().slice(0,10),
+        contract:symbol,brokerAccount:''};
     });
+    rts.push(...foldRoundTrips(fills,{product:symbol,productLabel:displayName,
+      instrument:'options',
+      gross:(dir,ep,xp,q)=>(dir==='Long'?xp-ep:ep-xp)*q*100,
+      fee:null}));
   });
   
   // Sort by date
@@ -3430,41 +3422,44 @@ function parseTradingView(rows){
   filled.forEach(r=>{const pr=tvProduct(r['Symbol']);if(!byP[pr])byP[pr]=[];byP[pr].push(r)});
   const rts=[];
   Object.entries(byP).forEach(([product,orders])=>{
-    let pos=0,entries=[];
-    orders.forEach(o=>{
-      const qty=parseInt(o['Quantity']||'1')||1;
-      const price=parseFloat(String(o['Fill price']).replace(/[^0-9.\-]/g,''))||0;
-      const isBuy=String(o['Side']||'').trim().toLowerCase()==='buy';
-      const signed=isBuy?qty:-qty;
+    const isFut=!!TICK_VALUES[product];
+    const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
+    const fills=orders.map(o=>{
       const when=String(o['Placing time']||'');
-      const date=normalizeDate(when.split(' ')[0])||when.slice(0,10);
-      if(pos===0){entries=[{qty,price}];pos=signed}
-      else if((pos>0&&!isBuy)||(pos<0&&isBuy)){
-        const closeQty=Math.min(Math.abs(pos),qty);
-        const ep=entries.reduce((a,e)=>a+e.price*e.qty,0)/entries.reduce((a,e)=>a+e.qty,0);
-        const dir=pos>0?'Long':'Short';
-        const isFut=!!TICK_VALUES[product];
-        const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
-        const gross=isFut
-          ?(dir==='Long'?(price-ep):(ep-price))/ts*tv*closeQty
-          :(dir==='Long'?(price-ep):(ep-price))*closeQty;
-        const fee=(isFut?(RT_FEES[product]||2.00):0)*closeQty;
-        rts.push({brokerAccount:'',date,product,contract:String(o['Symbol']||product),direction:dir,
-          entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,
-          grossPnl:Math.round(gross*100)/100,fees:Math.round(fee*100)/100,
-          pnl:Math.round((gross-fee)*100)/100,
-          instrument:isFut?'futures':'options',
-          strategies:[],emotionRating:7,rulesFollowed:[],notes:''});
-        const rem=Math.abs(pos)-closeQty;
-        if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}
-        else pos=pos>0?rem:-rem;
-      } else {entries.push({qty,price});pos+=signed}
+      return{qty:parseInt(o['Quantity']||'1')||1,
+        price:parseFloat(String(o['Fill price']).replace(/[^0-9.\-]/g,''))||0,
+        isBuy:String(o['Side']||'').trim().toLowerCase()==='buy',
+        date:normalizeDate(when.split(' ')[0])||when.slice(0,10),
+        contract:String(o['Symbol']||product),brokerAccount:''};
     });
+    rts.push(...foldRoundTrips(fills,{product,instrument:isFut?'futures':'options',
+      gross:(dir,ep,xp,q)=>{const pts=dir==='Long'?xp-ep:ep-xp;return isFut?pts/ts*tv*q:pts*q},
+      fee:q=>(isFut?(RT_FEES[product]||2.00):0)*q}));
   });
   return rts;
 }
 function parseTradovateRows(rows){
-const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});if(!filled.length)return[];filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));const byP={};filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});const rts=[];Object.entries(byP).forEach(([product,orders])=>{let pos=0,entries=[];orders.forEach(o=>{const bs=(o['B/S']||'').trim().toUpperCase();const qty=parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1');const price=parseFloat(o['Avg Fill Price']||o['avgPrice']||'0');const isBuy=bs==='BUY'||bs==='B';const signed=isBuy?qty:-qty;if(pos===0){entries=[{qty,price}];pos=signed}else if((pos>0&&!isBuy)||(pos<0&&isBuy)){const closeQty=Math.min(Math.abs(pos),qty);const ep=entries.reduce((s,e)=>s+e.price*e.qty,0)/entries.reduce((s,e)=>s+e.qty,0);const dir=pos>0?'Long':'Short';const date=o['Date']||o['Fill Time']||o['Timestamp']||'';const brokerAccount=o['Account']||'';const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;let pnl=dir==='Long'?((price-ep)/ts)*tv*closeQty:((ep-price)/ts)*tv*closeQty;const rtFee=(RT_FEES[product]||2.00)*closeQty;const netPnl=pnl-rtFee;rts.push({brokerAccount,date:normalizeDate(date.split(' ')[0]||date.split('T')[0])||new Date().toISOString().slice(0,10),product,contract:o['Contract']||product,direction:dir,entryPrice:ep.toFixed(2),exitPrice:price.toFixed(2),quantity:closeQty,grossPnl:Math.round(pnl*100)/100,fees:Math.round(rtFee*100)/100,pnl:Math.round(netPnl*100)/100,strategies:[],emotionRating:7,rulesFollowed:[],notes:''});const rem=Math.abs(pos)-closeQty;if(rem<=0){pos=0;entries=[];const left=qty-closeQty;if(left>0){entries=[{qty:left,price}];pos=isBuy?left:-left}}else pos=pos>0?rem:-rem}else{entries.push({qty,price});pos+=signed}})});
+  const filled=rows.filter(r=>{const st=(r['Status']||'').toLowerCase();const qty=parseInt(r['Filled Qty']||r['filledQty']||'0');return(st==='filled'||qty>0)&&(r['B/S'])});
+  if(!filled.length)return[];
+  filled.sort((a,b)=>(a['Fill Time']||a['Timestamp']||'').localeCompare(b['Fill Time']||b['Timestamp']||''));
+  const byP={};
+  filled.forEach(r=>{const p=(r['Product']||r['Contract']||'').replace(/[0-9]*[FGHJKMNQUVXZ]\d+$/i,'').toUpperCase();if(!byP[p])byP[p]=[];byP[p].push(r)});
+  const rts=[];
+  Object.entries(byP).forEach(([product,orders])=>{
+    const tv=TICK_VALUES[product]||1,ts=TICK_SIZES[product]||0.01;
+    const fills=orders.map(o=>{
+      const bs=(o['B/S']||'').trim().toUpperCase();
+      const d=o['Date']||o['Fill Time']||o['Timestamp']||'';
+      return{qty:parseInt(o['Filled Qty']||o['filledQty']||o['Quantity']||'1'),
+        price:parseFloat(o['Avg Fill Price']||o['avgPrice']||'0'),
+        isBuy:bs==='BUY'||bs==='B',
+        date:normalizeDate(d.split(' ')[0]||d.split('T')[0])||new Date().toISOString().slice(0,10),
+        contract:o['Contract']||product,brokerAccount:o['Account']||''};
+    });
+    rts.push(...foldRoundTrips(fills,{product,instrument:'futures',
+      gross:(dir,ep,xp,q)=>(dir==='Long'?xp-ep:ep-xp)/ts*tv*q,
+      fee:q=>(RT_FEES[product]||2.00)*q}));
+  });
   return rts;
 }
 function fileToRows(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=()=>rej(new Error('could not read file'));r.onload=e=>{try{res(parseCSV(e.target.result))}catch(err){rej(new Error('could not parse CSV'))}};r.readAsText(file)})}
@@ -3507,7 +3502,7 @@ function renderImportPreview(rts,fileCount,problems){
   if(rts.length>40)h+=`<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">+${rts.length-40} more</td></tr>`;
   h+='</tbody></table></div></div>';
   document.getElementById('importPreview').innerHTML=h;
-  status.innerHTML=`<div class="import-status success">✓ ${rts.length} trades ready — click Review to tag each one</div>`+(problems.length?`<div class="import-status error" style="margin-top:8px">Skipped: ${problems.map(esc).join(' · ')}</div>`:'');
+  status.innerHTML=`<div class="import-status success">✓ ${rts.length} trade${rts.length!==1?"s":""} ready — click Review to tag each one</div>`+(problems.length?`<div class="import-status error" style="margin-top:8px">Skipped: ${problems.map(esc).join(' · ')}</div>`:'');
   document.getElementById('btnImportConfirm').style.display='inline-block';
 }
 async function handleImportFiles(fileList){
@@ -3582,7 +3577,7 @@ function revBack(){
 }
 function showReviewSlide(){const t=reviewData[reviewIndex];const total=reviewData.length;const pct=((reviewIndex)/total*100).toFixed(0);const _left=reviewData.filter(x=>!x._autoTagged).length;const _done=reviewData.slice(0,reviewIndex).filter(x=>!x._autoTagged).length;document.getElementById('importModalTitle').textContent=`Review Trade ${_done+1} of ${_left}`+(total>_left?` (${total-_left} tagged as copies)`:'');const emoVal=t.emotionRating||7;const body=document.getElementById('importBody');
 body.innerHTML=`<div class="review-slide"><div class="review-progress"><span class="review-progress-text">${reviewIndex+1}/${total}</span><div class="review-progress-bar"><div class="review-progress-fill" style="width:${pct}%"></div></div><span class="review-progress-text" style="text-align:right">${pct}%</span></div>
-${(()=>{const g=copyGroupIdx(reviewIndex);const an=acctNameForBroker(t.brokerAccount)||t.brokerAccount;return (an?`<div class="rv-acct">${esc(String(an))}</div>`:"")+(g.length?`<div class="copy-badge">${g.length} other ${esc(t.product)} ${esc(t.direction)} trade${g.length>1?"s":""} today &mdash; tag this one and apply to all of them</div>`:"")})()}<div class="review-trade-summary"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}" style="width:42px;height:42px;font-size:16px">${t.direction==='Long'?'▲':'▼'}</div><div class="review-trade-info"><h3>${t.product} — ${t.direction}</h3><p>${t.date} · Entry: ${t.entryPrice} → Exit: ${t.exitPrice} · Qty: ${t.quantity}</p></div><div class="review-trade-pnl" style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div></div>
+${(()=>{const g=copyGroupIdx(reviewIndex);const an=acctNameForBroker(t.brokerAccount)||t.brokerAccount;return (an?`<div class="rv-acct">${esc(String(an))}</div>`:"")+(((t.entryFills||1)+(t.exitFills||1))>2?`<div class="scale-badge">One position, ${t.entryFills} fill${t.entryFills!==1?"s":""} in and ${t.exitFills} out &mdash; averaged into a single trade</div>`:"")+(g.length?`<div class="copy-badge">${g.length} other ${esc(t.product)} ${esc(t.direction)} trade${g.length>1?"s":""} today &mdash; tag this one and apply to all of them</div>`:"")})()}<div class="review-trade-summary"><div class="dir-ind ${t.direction==='Long'?'dir-long':'dir-short'}" style="width:42px;height:42px;font-size:16px">${t.direction==='Long'?'▲':'▼'}</div><div class="review-trade-info"><h3>${t.product} — ${t.direction}</h3><p>${t.date} · Entry: ${t.entryPrice} → Exit: ${t.exitPrice} · Qty: ${t.quantity}</p></div><div class="review-trade-pnl" style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">${f$(t.pnl)}</div></div>
 <div class="review-field"><label>What strategies did you use? (select all that apply)</label><div class="chip-row" id="rv-strat-chips">${STRATEGIES.map(s=>'<div class="chip'+((t.strategies||[]).includes(s)?' active':'')+'" onclick="toggleRevStrat('+reviewIndex+',\''+s.replace(/'/g,"\\'")+'\',this)">'+s+'</div>').join('')}</div></div>
 <div class="review-field"><label>How were your emotions? (1 = tilted, 10 = peak discipline)</label><div class="emotion-slider-container"><input type="range" min="1" max="10" value="${emoVal}" class="emotion-slider" id="rv-emo" oninput="updateEmoPreview(this.value,${reviewIndex})"><div><div class="emotion-value" id="rv-emo-val" style="color:${emoColor(emoVal)}">${emoVal}</div><div class="emotion-label" id="rv-emo-label">${emoText(emoVal)}</div></div></div></div>
 <div class="review-field"><label>Rules followed</label><div class="rules-grid">${RL.map((r,i)=>`<div class="rule-item${(t.rulesFollowed||[]).includes(r)?' checked':''}" onclick="toggleRevRule(${reviewIndex},${i},this)"><span class="rule-check">${(t.rulesFollowed||[]).includes(r)?'✓':''}</span><span class="rule-text">${r}</span></div>`).join('')}</div></div>
