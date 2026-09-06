@@ -9,6 +9,35 @@ const pool = new Pool({
   ssl: !isInternal && process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Statements the last init could not apply. A schema problem used to be invisible
+// until something downstream broke; this makes it reportable.
+const initFailures = [];
+
+// Postgres runs a multi-statement simple query inside one implicit transaction,
+// so a single bad statement silently rolls back all of them — which is how a
+// legacy table once blocked every migration in this file at once. Run them one
+// at a time instead: a statement that cannot apply is recorded and skipped, and
+// the other forty-six still land.
+async function runSchema(client, sql) {
+  const statements = sql
+    .split('\n').map(l => l.replace(/--.*$/, '')).join('\n')  // strip line comments
+    .split(';').map(x => x.trim()).filter(Boolean);
+  initFailures.length = 0;
+  for (const stmt of statements) {
+    try {
+      await client.query(stmt);
+    } catch (err) {
+      const label = stmt.replace(/\s+/g, ' ').slice(0, 90);
+      initFailures.push({ statement: label, error: err.message, code: err.code });
+      console.error('Schema statement failed [' + err.code + ']', label, '::', err.message);
+    }
+  }
+  if (initFailures.length) {
+    console.error(initFailures.length + ' of ' + statements.length + ' schema statements failed — see above');
+  }
+  return initFailures;
+}
+
 const initDB = async () => {
   const client = await pool.connect();
   try {
@@ -24,7 +53,7 @@ const initDB = async () => {
         console.log('Renamed legacy accounts table to accounts_legacy_backup');
       }
     }
-    await client.query(`
+    await runSchema(client, `
       -- Users table
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -250,4 +279,4 @@ const initDB = async () => {
   }
 };
 
-module.exports = { pool, initDB };
+module.exports = { pool, initDB, initFailures };

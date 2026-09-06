@@ -1033,7 +1033,7 @@ let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRiskPlan={},
 let _allTrades=[],_accounts=[],_payouts=[],curAccount=null;
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
-let _loadError='',_reloadQueued=false;
+let _loadError='',_reloadQueued=false,_updTries=0;
 const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts','/api/payouts'];
 async function loadAllData(){
   _loadError='';
@@ -1054,9 +1054,14 @@ async function loadAllData(){
   applyAcctFilter();
   _dataLoaded=true;
   const updating=res.some(r=>r.status==='rejected'&&r.reason&&r.reason.updating);
+  if(!updating&&!failed.length)_updTries=0;
   if(updating){
-    _loadError='The journal is finishing an update — this clears on its own in a few seconds.';
-    if(!_reloadQueued){_reloadQueued=true;setTimeout(()=>{_reloadQueued=false;retryLoad()},6000)}
+    _updTries++;
+    // Stop promising it clears by itself once it plainly has not.
+    _loadError=_updTries<=2
+      ?'The journal is finishing an update — this clears on its own in a few seconds.'
+      :'The update is taking longer than it should. Your data is safe and nothing has been deleted, but this needs a look — send Sean the output of app.simplyoptionsacademy.com/api/health';
+    if(_updTries<=2&&!_reloadQueued){_reloadQueued=true;setTimeout(()=>{_reloadQueued=false;retryLoad()},6000)}
   }else if(failed.length)_loadError=failed.length===LOAD_PATHS.length
     ?'We could not reach the server just now. Nothing has been deleted — your data is still saved. Try reloading the page.'
     :'Part of your data did not load ('+failed.map(p=>p.split('/').pop()).join(', ')+'). Nothing has been deleted — try reloading the page.';
@@ -1219,7 +1224,7 @@ function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(
 function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
 function viewBanners(){
   let h='';
-  if(_loadError)h+='<div class="vbanner '+(_reloadQueued?'info':'err')+'">'+esc(_loadError)+' <button onclick="retryLoad()">'+(_reloadQueued?'Check now':'Retry')+'</button></div>';
+  if(_loadError)h+='<div class="vbanner '+(_reloadQueued&&_updTries<=2?'info':'err')+'">'+esc(_loadError)+' <button onclick="retryLoad()">'+(_reloadQueued?'Check now':'Retry')+'</button></div>';
   if(curAccount&&_allTrades.length&&trades.length<_allTrades.length){
     const nm=(_accounts.find(a=>a.id===curAccount)||{}).name||'one account';
     h+='<div class="vbanner info">Showing <b>'+trades.length+'</b> of '+_allTrades.length+' trades — filtered to <b>'+esc(nm)+'</b>. <button onclick="setAccount(\'\')">Show all accounts</button></div>';

@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const { pool, initDB } = require('./db');
+const { pool, initDB, initFailures } = require('./db');
 const { generateToken, authMiddleware, mentorOnly } = require('./auth');
 const Anthropic = require('@anthropic-ai/sdk').default;
 
@@ -1464,7 +1464,12 @@ app.post('/api/mentor/rollcall', authMiddleware, mentorOnly, async (req, res) =>
 // ═══════════════════════════════════
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, db: dbReady, uptime: Math.round(process.uptime()) });
+  // Public on purpose: a schema problem in production needs to be reportable
+  // without a deploy log. Names of failed statements only, never any user data.
+  res.json({ ok: true, db: dbReady, uptime: Math.round(process.uptime()),
+    schemaFailures: initFailures.length,
+    schema: initFailures.map(f => ({ statement: f.statement, code: f.code, error: f.error })),
+    lastInitError: lastInitError || null, initAttempts });
 });
 
 app.get('*', (req, res) => {
@@ -1475,18 +1480,21 @@ app.get('*', (req, res) => {
 // START SERVER
 // ═══════════════════════════════════
 
-let dbReady = false;
+let dbReady = false, lastInitError = '', initAttempts = 0;
 async function start() {
   // Listen first so the healthcheck passes and deploy logs stay inspectable
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`SOA Trading Journal API running on port ${PORT}`);
   });
   const tryInit = async (attempt) => {
+    initAttempts = attempt;
     try {
       await initDB();
       dbReady = true;
-      console.log('Database ready');
+      lastInitError = '';
+      console.log('Database ready' + (initFailures.length ? ' (with ' + initFailures.length + ' failed statement(s) — see /api/health)' : ''));
     } catch (err) {
+      lastInitError = err.message;
       console.error(`Database init failed (attempt ${attempt}):`, err.message);
       if (attempt < 20) setTimeout(() => tryInit(attempt + 1), 15000);
     }
