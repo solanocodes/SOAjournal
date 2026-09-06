@@ -867,6 +867,9 @@ async function coachTool(name, input, userId) {
       drawdown_floor: a.floor,
       floor_note: a.lockIgnored ? 'The trader entered a "stops trailing at" level below where this drawdown starts, which cannot be right; it is being ignored. Tell them to check that field.' : a.floorLocked ? 'The floor has stopped rising — it is locked at the level the trader entered.' : undefined,
       room_to_floor: a.room,
+      available_to_withdraw: a.withdrawable,
+      must_keep_balance_above: a.retainBalance || null,
+      withdraw_note: a.withdrawable === null ? 'Not known — the trader has not set the balance this firm makes them keep in the account.' : 'Everything above ' + a.retainBalance + ' can be taken out today.',
       high_water_mark: a.highWaterMark,
       hwm_note: a.hwmSource === 'closed-trades' ? 'Computed from closed trades only, so it is a LOWER bound — the real peak may be higher and the real room smaller.' : a.hwmSource === 'entered' ? 'Entered by the trader.' : 'Unknown.',
       trading_days: a.tradingDays,
@@ -1076,6 +1079,7 @@ function acctRow(r) {
     anchorDate: r.anchor_date || '', ddType: r.dd_type || 'static',
     ddAmount: parseFloat(r.dd_amount || 0), ddLock: parseFloat(r.dd_lock || 0),
     hwmOverride: parseFloat(r.hwm_override || 0), status: r.status || 'active',
+    retainBalance: parseFloat(r.retain_balance || 0),
     lastSync: r.last_sync };
 }
 
@@ -1168,6 +1172,12 @@ async function computeAccounts(userId) {
     }
 
     // Split by consequence: without these the risk numbers cannot be computed at all.
+    // What the trader can actually withdraw: everything above the balance the firm
+    // makes them leave in. On a funded Take Profit account that is the account size
+    // plus the drawdown, so clearing the buffer is what unlocks a payout.
+    const withdrawable = (balance !== null && a.retainBalance > 0)
+      ? Math.max(0, Math.round((balance - a.retainBalance) * 100) / 100) : null;
+
     const missing = [];
     if (!anchored) missing.push('current balance');
     if (!(a.ddAmount > 0)) missing.push('drawdown limit');
@@ -1181,6 +1191,7 @@ async function computeAccounts(userId) {
       accountProfit: Math.round(accountProfit * 100) / 100, profitFromAnchorOnly,
       tradeCount: mine.length, tradingDays: days.length,
       highWaterMark: hwm, hwmSource, floor, room, initialFloor, floorLocked, lockIgnored,
+      withdrawable,
       payoutChecks: checks,
       payoutEligible: checks.length > 0 && checks.every(c => c.ok),
       needsSetup: missing, niceToHave: optional
@@ -1255,23 +1266,23 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
         `UPDATE accounts SET name=$1, firm=$2, env=$3, broker_ids=$4, tv_user=$5, tv_pass_enc=$6,
          phase=$7, profit_target=$8, max_drawdown=$9, min_days=$10, consistency_pct=$11, payout_min=$12,
          account_size=$13, anchor_balance=$14, anchor_date=$15, dd_type=$16, dd_amount=$17,
-         dd_lock=$18, hwm_override=$19, status=$20
-         WHERE id=$21 AND user_id=$22`,
+         dd_lock=$18, hwm_override=$19, status=$20, retain_balance=$21
+         WHERE id=$22 AND user_id=$23`,
         [a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'',
          a.tvPass ? passEnc : cur.tv_pass_enc,
          a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
          a.accountSize||0, a.anchorBalance||0, a.anchorDate||'', DD_TYPES.includes(a.ddType)?a.ddType:'static',
          a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active',
-         a.id, req.user.id]);
+         a.retainBalance||0, a.id, req.user.id]);
       res.json({ success: true, id: a.id });
     } else {
       const r = await pool.query(
-        `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min, account_size, anchor_balance, anchor_date, dd_type, dd_amount, dd_lock, hwm_override, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
+        `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min, account_size, anchor_balance, anchor_date, dd_type, dd_amount, dd_lock, hwm_override, status, retain_balance)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id`,
         [req.user.id, a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'', passEnc,
          a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
          a.accountSize||0, a.anchorBalance||0, a.anchorDate||'', DD_TYPES.includes(a.ddType)?a.ddType:'static',
-         a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active']);
+         a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active', a.retainBalance||0]);
       res.json({ success: true, id: r.rows[0].id });
     }
   } catch (err) {

@@ -248,6 +248,9 @@ const initDB = async () => {
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dd_lock DECIMAL(12,2) DEFAULT 0;
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS hwm_override DECIMAL(12,2) DEFAULT 0;
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+      -- The balance the firm requires you to leave in the account. Whatever sits
+      -- above it is what you can actually take out.
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS retain_balance DECIMAL(12,2) DEFAULT 0;
 
       -- Money taken off an account. A payout lowers the balance but never the
       -- drawdown floor, which is exactly what makes withdrawals risky.
