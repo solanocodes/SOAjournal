@@ -230,6 +230,41 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .dash-hero-stat strong{color:var(--text-primary);font-weight:700}
 
 .dash-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px}
+.imp-new{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.imp-new-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(111,176,131,.07);border:1px solid rgba(111,176,131,.35);border-radius:9px;padding:10px 13px}
+.imp-new-t{font-size:12.5px;font-weight:600}
+.imp-new-s{font-size:11px;color:var(--text-muted);margin-top:2px}
+.prop-card{margin-bottom:16px}
+.prop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.prop-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.prop-sub{font-size:11.5px;color:var(--text-muted);margin-top:3px}
+.prop-status{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;white-space:nowrap}
+.prop-opt{font-size:11.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.55}
+.prop-need{background:rgba(212,175,90,.08);border:1px solid rgba(212,175,90,.3);border-radius:8px;padding:10px 13px;font-size:12.5px;line-height:1.55;margin-bottom:14px;color:var(--text-secondary)}
+.prop-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px}
+.prop-nums>div{display:flex;flex-direction:column;gap:3px}
+.pn-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.04em;text-transform:uppercase}
+.pn-v{font-family:var(--mono);font-size:17px;font-weight:600}
+.prop-bar{height:6px;border-radius:3px;background:var(--bg-elevated);overflow:hidden;margin-bottom:6px}
+.prop-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.prop-bar-cap{font-size:11px;color:var(--text-muted);margin-bottom:12px}
+.prop-bar-cap span{border-bottom:1px dotted var(--text-muted);cursor:help}
+.prop-note{font-size:12.5px;color:var(--text-secondary);padding:9px 12px;background:var(--bg-elevated);border-radius:8px;margin-bottom:12px}
+.prop-checks{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.pc-row{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-secondary)}
+.pc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pc-d{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-muted)}
+.prop-sim{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:11px 13px;background:var(--bg-elevated);border-radius:9px;margin-bottom:12px}
+.prop-sim label{font-size:12.5px;color:var(--text-secondary);white-space:nowrap}
+.prop-sim input{width:110px;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text-primary);font-family:var(--mono);font-size:13px}
+.prop-sim-out{font-size:12.5px;flex:1;min-width:200px}
+.prop-actions{display:flex;gap:8px;flex-wrap:wrap}
+.prop-payouts{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.pp-row{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-muted);padding:4px 0;font-family:var(--mono)}
+.pp-row button{margin-left:auto;background:none;border:0;color:var(--text-muted);cursor:pointer;font-size:12px}
+.pp-row button:hover{color:var(--red)}
+.acct-hint{font-size:11.5px;color:var(--text-muted);line-height:1.55;margin-top:10px}
+.fh{color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0}
 .vbanner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;padding:12px 16px;border-radius:10px;margin-bottom:16px;line-height:1.5}
 .vbanner.err{background:rgba(220,80,80,.10);border:1px solid rgba(220,80,80,.35);color:var(--text-primary)}
 .vbanner.info{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-secondary)}
@@ -995,11 +1030,11 @@ async function api(method,path,body){
   return data;
 }
 let _cachedJournals={},_cachedBadges={},_cachedMilestones={},_cachedRiskPlan={},_cachedSettings={};
-let _allTrades=[],_accounts=[],curAccount=null;
+let _allTrades=[],_accounts=[],_payouts=[],curAccount=null;
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
 let _loadError='';
-const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts'];
+const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts','/api/payouts'];
 async function loadAllData(){
   _loadError='';
   // Settle each call on its own. One failing endpoint used to reject the whole
@@ -1015,6 +1050,7 @@ async function loadAllData(){
   _cachedRiskPlan=val(4,{})||{};
   _cachedSettings=val(5,{})||{};
   _accounts=val(6,[])||[];
+  _payouts=val(7,[])||[];
   applyAcctFilter();
   _dataLoaded=true;
   if(failed.length)_loadError=failed.length===LOAD_PATHS.length
@@ -1173,7 +1209,7 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'props',l:'Prop Firms'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
@@ -1186,7 +1222,7 @@ function viewBanners(){
   }
   return h;
 }
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,props:rProps,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const _mdCount=tr.filter(t=>t.manualDay).reduce((a,t)=>a+((parseInt(t.tradeCount)||1)-1),0);const _pt=tr.filter(t=>!t.manualDay);const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=_pt.filter(t=>t.pnl>0),l=_pt.filter(t=>t.pnl<0);const wr=_pt.length?w.length/_pt.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length+_mdCount,sk,ar,avgEmo,em,st,cv}}
@@ -2787,22 +2823,198 @@ function loadCoachMemory(){
   }).catch(()=>{el.innerHTML='<div style="color:var(--text-muted)">Could not load coach memory.</div>'});
 }
 function delCoachMem(id){api('DELETE','/api/coach/memory/'+id).then(loadCoachMemory).catch(e=>alert(e.message))}
+
+// ─── PROP FIRMS ───
+// Firm presets carry names and labels only. Every number stays blank and comes
+// from the trader: a stale drawdown limit shown as fact could cost a funded account.
+const FIRM_PRESETS=[
+  {key:'tpt',  name:'Take Profit Trader', ids:['TAKEPROFIT','TPT'],  ddType:'eod'},
+  {key:'mffu', name:'My Funded Futures',  ids:['MFFUSF','MFFU','MFF'], ddType:'eod'},
+  {key:'tstp', name:'Topstep',            ids:['TOPSTEP','TSX'],     ddType:'intraday'},
+  {key:'lucid',name:'Lucid Trading',      ids:['LUCID'],             ddType:'intraday'},
+  {key:'apex', name:'Apex Trader Funding',ids:['APEX'],              ddType:'intraday'}
+];
+function firmFromBrokerId(id){
+  const up=String(id||'').toUpperCase();
+  const m=FIRM_PRESETS.find(f=>f.ids.some(x=>up.startsWith(x)));
+  return m||null;
+}
+const DD_LABELS={static:'Static — floor never moves',eod:'Trailing on end-of-day balance',intraday:'Trailing on intraday high'};
+
+function loadPayouts(){return api('GET','/api/payouts').then(d=>{_payouts=d||[]}).catch(()=>{_payouts=[]})}
+
+function acctStatus(a){
+  if(a.status==='breached')return{t:'BREACHED',c:'var(--red)'};
+  if(a.status==='passed')return{t:'PASSED',c:'var(--green)'};
+  if(a.status==='closed')return{t:'CLOSED',c:'var(--text-muted)'};
+  if(a.balance==null||a.floor==null)return{t:'SETUP NEEDED',c:'var(--yellow)'};
+  if(a.room!=null&&a.room<=0)return{t:'AT THE FLOOR',c:'var(--red)'};
+  const dayCap=(_cachedRiskPlan&&_cachedRiskPlan.maxLossPerDay)||0;
+  if(a.room!=null&&dayCap>0&&a.room<=dayCap)return{t:'ONE BAD DAY',c:'var(--red)'};
+  if(a.room!=null&&dayCap>0&&a.room<=dayCap*2)return{t:'THIN',c:'var(--yellow)'};
+  if(a.payoutEligible)return{t:'PAYOUT READY',c:'var(--green)'};
+  return{t:a.phase==='funded'?'FUNDED':'EVAL',c:'var(--text-secondary)'};
+}
+
+function rProps(el){
+  const list=_accounts||[];
+  let h='<h2 style="font-size:20px;font-weight:800;margin-bottom:6px">Prop Firms</h2>'+
+    '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:20px;max-width:640px;line-height:1.6">Where every account actually stands. Imports move the balance forward on their own &mdash; you only enter what no CSV contains: your balance today, and the rules your firm set.</div>';
+  if(!list.length){
+    h+='<div class="empty-state fade-up"><div class="empty-icon">\U0001F3E6</div><h3 class="empty-title">No accounts yet</h3>'+
+       '<p class="empty-text">Add your first prop account below, or just import a CSV &mdash; the journal will spot the account and offer to set it up.</p></div>';
+  }
+  list.forEach((a,i)=>{h+=propCard(a,i)});
+  h+='<div class="card" style="margin-top:18px"><div style="font-size:15px;font-weight:700;margin-bottom:12px">Add an account</div>'+renderAcctForm(null)+'</div>';
+  el.innerHTML=h;
+}
+
+function money(v){return v==null?'&mdash;':f$(v)}
+
+function propCard(a,i){
+  const st=acctStatus(a);
+  const needs=a.needsSetup||[];
+  const dayCap=(_cachedRiskPlan&&_cachedRiskPlan.maxLossPerDay)||0;
+  const roomPct=(a.room!=null&&a.ddAmount>0)?Math.max(0,Math.min(100,a.room/a.ddAmount*100)):null;
+  let h='<div class="card prop-card fade-up stagger-'+Math.min(i+1,8)+'">';
+  h+='<div class="prop-head"><div><div class="prop-name">'+esc(a.name)+'</div>'+
+     '<div class="prop-sub">'+esc(a.firm||'No firm set')+(a.accountSize>0?' · '+f$(a.accountSize):'')+' · '+(a.phase==='funded'?'Funded':'Evaluation')+'</div></div>'+
+     '<span class="prop-status" style="color:'+st.c+'">'+st.t+'</span></div>';
+
+  if(needs.length){
+    h+='<div class="prop-need">Can\'t track this account yet — still need your <strong>'+needs.map(esc).join(', ')+'</strong>. '+
+       'Your firm sets those; open Edit account below and type what their dashboard shows.</div>';
+  }else if((a.niceToHave||[]).length){
+    h+='<div class="prop-opt">Tracking. Add your <strong>'+a.niceToHave.map(esc).join(' and ')+'</strong> for a sharper read.</div>';
+  }
+
+  h+='<div class="prop-nums">'+
+     '<div><span class="pn-l">Balance</span><span class="pn-v">'+money(a.balance)+'</span></div>'+
+     '<div><span class="pn-l">Drawdown floor</span><span class="pn-v">'+money(a.floor)+'</span></div>'+
+     '<div><span class="pn-l">Room to floor</span><span class="pn-v" style="color:'+(a.room==null?'var(--text-primary)':a.room<=0?'var(--red)':a.room<=dayCap?'var(--red)':'var(--green)')+'">'+money(a.room)+'</span></div>'+
+     '<div><span class="pn-l">P&L since '+(a.anchorDate?fD(a.anchorDate):'start')+'</span><span class="pn-v" style="color:'+(a.tradePnl>=0?'var(--green)':'var(--red)')+'">'+f$(a.tradePnl)+'</span></div>'+
+     '</div>';
+
+  if(roomPct!=null){
+    h+='<div class="prop-bar"><div class="prop-bar-fill" style="width:'+roomPct.toFixed(1)+'%;background:'+(a.room<=dayCap&&dayCap>0?'var(--red)':'var(--accent)')+'"></div></div>'+
+       '<div class="prop-bar-cap">'+(a.room>=a.ddAmount
+          ? f$(a.room)+' of room — more than the '+f$(a.ddAmount)+' drawdown, the floor has stopped following you'
+          : f$(a.room)+' left of your '+f$(a.ddAmount)+' drawdown')+
+       (a.ddType!=='static'&&a.hwmSource==='closed-trades'?' · <span title="We only see closed trades, so an intraday peak inside a trade is invisible. Real room may be smaller.">best case</span>':'')+'</div>';
+  }
+
+  if(dayCap>0&&a.room!=null){
+    h+='<div class="prop-note">'+(a.room<=dayCap
+      ? 'One max-loss day ('+f$(dayCap)+') breaches this account.'
+      : 'You could take '+Math.floor(a.room/dayCap)+' max-loss day'+(Math.floor(a.room/dayCap)!==1?'s':'')+' ('+f$(dayCap)+' each) before hitting the floor.')+'</div>';
+  }
+
+  if(a.payoutChecks&&a.payoutChecks.length){
+    h+='<div class="prop-checks">'+a.payoutChecks.map(c=>'<div class="pc-row"><span class="pc-dot" style="background:'+(c.ok?'var(--green)':'var(--text-muted)')+'"></span><span>'+esc(c.label)+'</span><span class="pc-d">'+esc(c.detail)+'</span></div>').join('')+'</div>';
+  }
+
+  // Withdrawal check — the question that started all this
+  if(a.balance!=null&&a.floor!=null){
+    h+='<div class="prop-sim"><label>If I withdraw</label>'+
+       '<input type="number" placeholder="0" id="wd-'+a.id+'" oninput="simWithdraw('+a.id+')">'+
+       '<span id="wdout-'+a.id+'" class="prop-sim-out"></span></div>';
+  }
+
+  h+='<div class="prop-actions">'+
+     '<button class="btn-sm" onclick="togglePropEdit('+a.id+')">Edit account</button>'+
+     (a.balance!=null?'<button class="btn-sm" onclick="logPayout('+a.id+')">Log a payout</button>':'')+
+     '</div>';
+  const paid=_payouts.filter(x=>x.accountId===a.id);
+  if(paid.length){
+    h+='<div class="prop-payouts">'+paid.map(x=>'<div class="pp-row"><span>'+fD(x.date)+'</span><span>'+f$(x.amount)+'</span>'+
+      '<button onclick="delPayout('+x.id+')" title="Remove">✕</button></div>').join('')+'</div>';
+  }
+  h+='<div id="pedit-'+a.id+'" style="display:none;margin-top:14px">'+renderAcctForm(a)+'</div>';
+  h+='</div>';
+  return h;
+}
+
+// Create an account straight from an import. Firm and broker ID come from the
+// file; every number stays blank because no fills export contains them.
+function createAcctFromImport(brokerId){
+  const f=firmFromBrokerId(brokerId);
+  const name=prompt('Name this account',(f?f.name:'')+(f?' ':'')+'account');
+  if(name===null||!name.trim())return;
+  api('POST','/api/accounts',{name:name.trim(),firm:f?f.name:'',brokerIds:brokerId,
+    env:'demo',phase:'eval',ddType:f?f.ddType:'static'})
+    .then(()=>api('GET','/api/accounts')).then(d=>{
+      _accounts=d||[];refreshAcctSwitch();
+      alert('Created. Finish the import, then open Prop Firms to add the balance and drawdown — those are the only numbers the CSV cannot tell us.');
+      if(pendingImports.length)renderImportPreview(pendingImports,1,[]);
+    }).catch(e=>alert(e.message));
+}
+function togglePropEdit(id){const b=document.getElementById('pedit-'+id);if(b)b.style.display=b.style.display==='none'?'block':'none'}
+
+function simWithdraw(id){
+  const a=(_accounts||[]).find(x=>x.id===id);const out=document.getElementById('wdout-'+id);
+  if(!a||!out)return;
+  const amt=parseFloat(document.getElementById('wd-'+id).value);
+  if(!isFinite(amt)||amt<=0){out.textContent='';return}
+  // A payout lowers the balance. It never lowers the drawdown floor — that is
+  // exactly what makes withdrawing from a trailing account risky.
+  const after=a.balance-amt, room=after-a.floor;
+  const dayCap=(_cachedRiskPlan&&_cachedRiskPlan.maxLossPerDay)||0;
+  let verdict,color;
+  if(room<=0){verdict='breaches the account immediately';color='var(--red)'}
+  else if(dayCap>0&&room<=dayCap){verdict='leaves '+f$(room)+' — one max-loss day ('+f$(dayCap)+') breaches it';color='var(--red)'}
+  else if(dayCap>0&&room<=dayCap*2){verdict='leaves '+f$(room)+' — under two max-loss days of room';color='var(--yellow)'}
+  else verdict='leaves '+f$(room)+' above the floor';
+  out.innerHTML='<span style="color:'+(color||'var(--green)')+'">Balance '+f$(after)+' — '+verdict+'.</span>'+
+    (dayCap>0?'':' <span style="color:var(--text-muted)">Set a max loss per day in your Risk Plan for a sharper read.</span>');
+}
+
+function logPayout(id){
+  const amt=prompt('How much did you withdraw from this account?');
+  if(amt===null)return;
+  const v=parseFloat(String(amt).replace(/[^0-9.\-]/g,''));
+  if(!isFinite(v)||v<=0){alert('Enter an amount greater than zero.');return}
+  const d=prompt('Date of the payout (YYYY-MM-DD)',etToday());
+  if(d===null)return;
+  api('POST','/api/payouts',{accountId:id,date:normalizeDate(d)||d,amount:v})
+    .then(()=>Promise.all([api('GET','/api/accounts'),loadPayouts()]))
+    .then(([acc])=>{_accounts=acc||[];ren()})
+    .catch(e=>alert(e.message));
+}
+function delPayout(id){
+  if(!confirm('Remove this payout?'))return;
+  api('DELETE','/api/payouts/'+id)
+    .then(()=>Promise.all([api('GET','/api/accounts'),loadPayouts()]))
+    .then(([acc])=>{_accounts=acc||[];ren()})
+    .catch(e=>alert(e.message));
+}
+function etToday(){try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).reduce((a,x)=>(a[x.type]=x.value,a),{});return p.year+'-'+p.month+'-'+p.day}catch(e){return new Date().toISOString().slice(0,10)}}
+
 function renderAcctForm(a){
   a=a||{};const idp=a.id?"'"+a.id+"'":'null';
   return`<div class="acct-card" data-aid="${a.id||''}">
     <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
       <div class="field"><label>Account name</label><input value="${esc(a.name||'')}" data-f="name" placeholder="MFF Express 50K"></div>
-      <div class="field"><label>Firm</label><input value="${esc(a.firm||'')}" data-f="firm" placeholder="My Funded Futures"></div>
+      <div class="field"><label>Firm</label><input value="${esc(a.firm||'')}" data-f="firm" list="firmList" placeholder="Take Profit Trader"></div>
       <div class="field"><label>Environment</label><select data-f="env"><option value="demo"${a.env!=='live'?' selected':''}>Demo / Eval</option><option value="live"${a.env==='live'?' selected':''}>Live</option></select></div>
       <div class="field"><label>Phase</label><select data-f="phase"><option value="eval"${a.phase!=='funded'?' selected':''}>Evaluation</option><option value="funded"${a.phase==='funded'?' selected':''}>Funded</option></select></div>
       <div class="field"><label>Broker account IDs (comma-sep)</label><input value="${esc(a.brokerIds||'')}" data-f="brokerIds" placeholder="MFFUSFPRO06025084"></div>
       <div class="field"><label>Tradovate username</label><input value="${esc(a.tvUser||'')}" data-f="tvUser" autocomplete="off"></div>
       <div class="field"><label>Tradovate password ${a.hasCredentials?'(saved)':''}</label><input type="password" data-f="tvPass" placeholder="${a.hasCredentials?'••••••••':''}" autocomplete="new-password"></div>
+      <div class="field"><label>Account size $</label><input type="number" value="${a.accountSize||''}" data-f="accountSize" placeholder="50000"></div>
+      <div class="field"><label>Balance today $</label><input type="number" step="0.01" value="${a.anchorBalance||''}" data-f="anchorBalance" placeholder="53242.50"></div>
+      <div class="field"><label>&hellip; as of</label><input type="date" value="${a.anchorDate||''}" data-f="anchorDate"></div>
+      <div class="field"><label>Drawdown type</label><select data-f="ddType">${Object.entries(DD_LABELS).map(([k,v])=>`<option value="${k}"${(a.ddType||'static')===k?' selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label>Drawdown amount $</label><input type="number" value="${a.ddAmount||''}" data-f="ddAmount" placeholder="2000"></div>
+      <div class="field"><label>Stops trailing at $ <span class="fh">optional</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="leave blank if it never locks"></div>
+      <div class="field"><label>High-water mark $ <span class="fh">optional</span></label><input type="number" step="0.01" value="${a.hwmOverride||''}" data-f="hwmOverride" placeholder="from your firm's dashboard"></div>
       <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
       <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
       <div class="field"><label>Min trading days</label><input type="number" value="${a.minDays||''}" data-f="minDays"></div>
       <div class="field"><label>Consistency max %</label><input type="number" value="${a.consistencyPct||''}" data-f="consistencyPct"></div>
+      <div class="field"><label>Status</label><select data-f="status">${[['active','Active'],['passed','Passed'],['breached','Breached'],['closed','Closed']].map(([k,v])=>`<option value="${k}"${(a.status||'active')===k?' selected':''}>${v}</option>`).join('')}</select></div>
     </div>
+    <div class="acct-hint">Your firm sets these numbers, so the journal never assumes them &mdash; check them on your firm's dashboard and type what you see. Balance moves forward on its own from here.</div>
+    <datalist id="firmList">${FIRM_PRESETS.map(f=>`<option value="${f.name}">`).join('')}</datalist>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <button class="btn-primary" onclick="saveAcct(this,${idp})">${a.id?'Save changes':'Add account'}</button>
       ${a.id?`<button class="btn-sm" onclick="syncAcct(this,${a.id})">Sync from Tradovate</button><button class="btn-sm" style="color:var(--red)" onclick="delAcct(${a.id})">Delete</button><span style="font-size:11px;color:var(--text-muted)">${a.lastSync?'Last sync '+fD(a.lastSync):'Never synced'}</span>`:''}
@@ -2810,7 +3022,7 @@ function renderAcctForm(a){
     </div>
   </div>`;
 }
-function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct'].forEach(k=>o[k]=Number(o[k])||0);return o}
+function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct','accountSize','anchorBalance','ddAmount','ddLock','hwmOverride'].forEach(k=>o[k]=Number(o[k])||0);return o}
 function saveAcct(btn,id){const card=btn.closest('.acct-card');const o=readAcctForm(card);if(id)o.id=parseInt(id);const msg=card.querySelector('.acct-msg');msg.textContent='Saving...';api('POST','/api/accounts',o).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];msg.textContent='Saved';refreshAcctSwitch();setTimeout(()=>ren(),400)}).catch(e=>{msg.textContent=e.message})}
 function delAcct(id){if(!confirm('Delete this account? Its trades stay but become unassigned.'))return;api('DELETE','/api/accounts/'+id).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];_allTrades.forEach(t=>{if(t.accountId===id)t.accountId=null});if(curAccount===id)setAccount('');else ren()}).catch(e=>alert(e.message))}
 function syncAcct(btn,id){const card=btn.closest('.acct-card');const msg=card.querySelector('.acct-msg');msg.textContent='Syncing with Tradovate...';btn.disabled=true;api('POST','/api/accounts/'+id+'/sync',{}).then(d=>{msg.textContent='Imported '+d.imported+' new trade'+(d.imported!==1?'s':'')+' ('+d.matched+' matched)';return loadAllData()}).then(()=>{setTimeout(()=>ren(),900)}).catch(e=>{msg.textContent=e.message;btn.disabled=false})}
@@ -2823,9 +3035,8 @@ function rSettings(el){
 
     <div class="card" style="margin-bottom:16px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Trading Accounts</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Track each prop firm account separately. Add your Tradovate login to sync trades automatically — no more CSVs. Broker account IDs route CSV imports to the right account too.</div>
-      ${_accounts.map(a=>renderAcctForm(a)).join('')}
-      ${renderAcctForm(null)}
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Accounts, balances, drawdown and payouts now live in the <strong style="color:var(--accent)">Prop Firms</strong> tab.</div>
+      <button class="btn-primary" onclick="sv('props')">Open Prop Firms</button>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -3494,7 +3705,19 @@ function renderImportPreview(rts,fileCount,problems){
   if(gkeys.length>1||gkeys.some(k=>groups[k].matched)){
     h+='<div class="imp-accts">'+gkeys.map(label=>{const g=groups[label];
       return`<div class="imp-acct${g.matched?' ok':''}"><span class="imp-acct-nm">${g.matched?'✓ ':''}${esc(label)}</span><span class="imp-acct-meta">${g.n} trade${g.n!==1?'s':''} · <strong style="color:${g.p>=0?'var(--green)':'var(--red)'}">${f$(g.p)}</strong></span></div>`}).join('')+'</div>';
-    if(gkeys.some(k=>!groups[k].matched))h+='<div class="imp-hint">Unmatched trades import to the account you have selected. To auto-route them, add the broker account ID in Settings → Trading Accounts.</div>';
+    if(gkeys.some(k=>!groups[k].matched))h+='<div class="imp-hint">Unmatched trades import to the account you have selected. To auto-route them, add the broker account ID in the Prop Firms tab.</div>';
+  }
+  // An account the journal has never seen. Offer to create it rather than filing
+  // the trades away silently — this is where a prop account gets set up.
+  const unknown=[...new Set(rts.map(t=>t.brokerAccount).filter(Boolean))].filter(id=>!acctNameForBroker(id));
+  if(unknown.length){
+    h+='<div class="imp-new">'+unknown.map(id=>{
+      const f=firmFromBrokerId(id);
+      const n=rts.filter(t=>t.brokerAccount===id).length;
+      return '<div class="imp-new-row"><div><div class="imp-new-t">New account &mdash; '+esc(id)+'</div>'+
+        '<div class="imp-new-s">'+(f?esc(f.name)+' · ':'')+n+' trade'+(n!==1?'s':'')+' in this file</div></div>'+
+        '<button class="btn-sm" onclick="createAcctFromImport(\''+esc(id).replace(/'/g,"")+'\')">Set it up</button></div>';
+    }).join('')+'</div>';
   }
   h+='<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)"><table class="import-preview-table"><thead><tr><th>Date</th><th>Account</th><th>Product</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Net P&L</th></tr></thead><tbody>';
   rts.slice(0,40).forEach(t=>{const nm=acctNameForBroker(t.brokerAccount)||t.brokerAccount||'—';
