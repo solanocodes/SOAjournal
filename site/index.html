@@ -234,6 +234,20 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .imp-new-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(111,176,131,.07);border:1px solid rgba(111,176,131,.35);border-radius:9px;padding:10px 13px}
 .imp-new-t{font-size:12.5px;font-weight:600}
 .imp-new-s{font-size:11px;color:var(--text-muted);margin-top:2px}
+.qs{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+.qs-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:9px}
+.qs-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;width:46px;flex-shrink:0}
+.qs-chips{display:flex;gap:6px;flex-wrap:wrap}
+.qs-chip{background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);font-size:12px;font-weight:500;padding:6px 13px;border-radius:7px;cursor:pointer;transition:all .15s}
+.qs-chip:hover{border-color:var(--text-muted);color:var(--text-primary)}
+.qs-chip.active{background:var(--accent);border-color:var(--accent);color:var(--bg-base);font-weight:600}
+.qs-out{font-size:12px;color:var(--text-secondary);line-height:1.55;margin-top:11px;padding-top:11px;border-top:1px solid var(--border)}
+.acct-more{margin-top:6px}
+.acct-more>summary{font-size:12px;color:var(--text-muted);cursor:pointer;padding:7px 0;list-style:none}
+.acct-more>summary::-webkit-details-marker{display:none}
+.acct-more>summary:before{content:'▸ ';font-size:10px}
+.acct-more[open]>summary:before{content:'▾ '}
+.acct-more>summary:hover{color:var(--text-primary)}
 .prop-card{margin-bottom:16px}
 .prop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .prop-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -2833,6 +2847,37 @@ function loadCoachMemory(){
 }
 function delCoachMem(id){api('DELETE','/api/coach/memory/'+id).then(loadCoachMemory).catch(e=>alert(e.message))}
 
+// ─── FIRM RULES ───
+// Reference numbers supplied by SOA for the firms this room actually trades.
+// They are PREFILLED into visible, editable fields — never applied silently — so
+// a trader can check every figure against their own dashboard before saving, and
+// theirs wins if a firm has changed terms since.
+const PROP_FIRMS=['Take Profit Trader','My Funded Futures','Topstep','Lucid Trading'];
+const FIRM_SHORT={'Take Profit Trader':'TPT','My Funded Futures':'MFFU','Topstep':'Topstep','Lucid Trading':'Lucid'};
+const PROP_SIZES=[25000,50000,100000,150000];
+// Evaluation: profit target and max drawdown are the same across these four firms.
+const EVAL_RULES={25000:{target:1500,dd:1500},50000:{target:3000,dd:2000},100000:{target:6000,dd:3000},150000:{target:9000,dd:4500}};
+// Days needed to pass an evaluation.
+const EVAL_MIN_DAYS={'Take Profit Trader':5,'My Funded Futures':2,'Topstep':2,'Lucid Trading':2};
+
+function presetFor(firm,size,phase){
+  const base=EVAL_RULES[size]||{target:0,dd:0};
+  if(phase==='funded'){
+    // Take Profit Trader funded runs an intraday drawdown until you are up by the
+    // drawdown amount; past that the floor has climbed to your starting balance,
+    // it stops following, and a payout is available — day one included.
+    if(firm==='Take Profit Trader'){
+      return{ddType:'intraday',ddAmount:base.dd,ddLock:size,profitTarget:0,payoutMin:base.dd,minDays:0,
+        summary:'<strong>'+f$(base.dd)+'</strong> intraday drawdown. Clear '+f$(base.dd)+' of profit and the floor locks at '+f$(size)+' — you are past IDD and can take a payout, even on day one.'};
+    }
+    return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:0,payoutMin:0,minDays:0,
+      summary:'<strong>'+f$(base.dd)+'</strong> drawdown. '+esc(firm)+'’s funded payout terms are not in SOA’s reference set — add your payout minimum and minimum days below.'};
+  }
+  const days=EVAL_MIN_DAYS[firm]||0;
+  return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:base.target,payoutMin:0,minDays:days,
+    summary:'Pass with <strong>'+f$(base.target)+'</strong> profit without losing '+f$(base.dd)+', over at least <strong>'+days+' trading day'+(days===1?'':'s')+'</strong>.'};
+}
+
 // ─── PROP FIRMS ───
 // Firm presets carry names and labels only. Every number stays blank and comes
 // from the trader: a stale drawdown limit shown as fact could cost a funded account.
@@ -2870,7 +2915,7 @@ function rProps(el){
   let h='<h2 style="font-size:20px;font-weight:800;margin-bottom:6px">Prop Firms</h2>'+
     '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:20px;max-width:640px;line-height:1.6">Where every account actually stands. Imports move the balance forward on their own &mdash; you only enter what no CSV contains: your balance today, and the rules your firm set.</div>';
   if(!list.length){
-    h+='<div class="empty-state fade-up"><div class="empty-icon">\U0001F3E6</div><h3 class="empty-title">No accounts yet</h3>'+
+    h+='<div class="empty-state fade-up"><div class="empty-icon">🏦</div><h3 class="empty-title">No accounts yet</h3>'+
        '<p class="empty-text">Add your first prop account below, or just import a CSV &mdash; the journal will spot the account and offer to set it up.</p></div>';
   }
   list.forEach((a,i)=>{h+=propCard(a,i)});
@@ -3002,37 +3047,81 @@ function etToday(){try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'Americ
 
 function renderAcctForm(a){
   a=a||{};const idp=a.id?"'"+a.id+"'":'null';
+  const uid=a.id||'new';
+  const sel=(v,cur)=>v===cur?' active':'';
+  const sizeRow=PROP_SIZES.map(sz=>`<button type="button" class="qs-chip${sel(sz,a.accountSize)}" onclick="qsPick(this,'size',${sz})">${'$'+(sz/1000)+'k'}</button>`).join('');
+  const firmRow=PROP_FIRMS.map(f=>`<button type="button" class="qs-chip${sel(f,a.firm)}" onclick="qsPick(this,'firm','${f.replace(/'/g,"")}')">${esc(f)}</button>`).join('');
+  const phaseRow=[['eval','Evaluation'],['funded','Funded']].map(([k,l])=>`<button type="button" class="qs-chip${sel(k,a.phase||'eval')}" onclick="qsPick(this,'phase','${k}')">${l}</button>`).join('');
   return`<div class="acct-card" data-aid="${a.id||''}">
-    <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-      <div class="field"><label>Account name</label><input value="${esc(a.name||'')}" data-f="name" placeholder="MFF Express 50K"></div>
-      <div class="field"><label>Firm</label><input value="${esc(a.firm||'')}" data-f="firm" list="firmList" placeholder="Take Profit Trader"></div>
-      <div class="field"><label>Environment</label><select data-f="env"><option value="demo"${a.env!=='live'?' selected':''}>Demo / Eval</option><option value="live"${a.env==='live'?' selected':''}>Live</option></select></div>
-      <div class="field"><label>Phase</label><select data-f="phase"><option value="eval"${a.phase!=='funded'?' selected':''}>Evaluation</option><option value="funded"${a.phase==='funded'?' selected':''}>Funded</option></select></div>
-      <div class="field"><label>Broker account IDs (comma-sep)</label><input value="${esc(a.brokerIds||'')}" data-f="brokerIds" placeholder="MFFUSFPRO06025084"></div>
-      <div class="field"><label>Tradovate username</label><input value="${esc(a.tvUser||'')}" data-f="tvUser" autocomplete="off"></div>
-      <div class="field"><label>Tradovate password ${a.hasCredentials?'(saved)':''}</label><input type="password" data-f="tvPass" placeholder="${a.hasCredentials?'••••••••':''}" autocomplete="new-password"></div>
-      <div class="field"><label>Account size $</label><input type="number" value="${a.accountSize||''}" data-f="accountSize" placeholder="50000"></div>
+    <div class="qs">
+      <div class="qs-row"><span class="qs-l">Firm</span><div class="qs-chips">${firmRow}</div></div>
+      <div class="qs-row"><span class="qs-l">Size</span><div class="qs-chips">${sizeRow}</div></div>
+      <div class="qs-row"><span class="qs-l">Phase</span><div class="qs-chips">${phaseRow}</div></div>
+      <div class="qs-out" data-qs-out>Pick all three and the targets, drawdown and trading-day minimum fill in for you.</div>
+    </div>
+    <div class="form-grid qs-main" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+      <div class="field"><label>Account name</label><input value="${esc(a.name||'')}" data-f="name" placeholder="TPT Discipline 50k"></div>
       <div class="field"><label>Balance today $</label><input type="number" step="0.01" value="${a.anchorBalance||''}" data-f="anchorBalance" placeholder="53242.50"></div>
       <div class="field"><label>&hellip; as of</label><input type="date" value="${a.anchorDate||''}" data-f="anchorDate"></div>
-      <div class="field"><label>Drawdown type</label><select data-f="ddType">${Object.entries(DD_LABELS).map(([k,v])=>`<option value="${k}"${(a.ddType||'static')===k?' selected':''}>${v}</option>`).join('')}</select></div>
-      <div class="field"><label>Drawdown amount $</label><input type="number" value="${a.ddAmount||''}" data-f="ddAmount" placeholder="2000"></div>
-      <div class="field"><label>Floor stops rising once it reaches $ <span class="fh">optional &mdash; a balance, not a profit amount</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="e.g. 50000 — blank if it never locks"></div>
-      <div class="field"><label>High-water mark $ <span class="fh">optional</span></label><input type="number" step="0.01" value="${a.hwmOverride||''}" data-f="hwmOverride" placeholder="from your firm's dashboard"></div>
-      <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
-      <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
-      <div class="field"><label>Min trading days</label><input type="number" value="${a.minDays||''}" data-f="minDays"></div>
-      <div class="field"><label>Consistency max %</label><input type="number" value="${a.consistencyPct||''}" data-f="consistencyPct"></div>
-      <div class="field"><label>Status</label><select data-f="status">${[['active','Active'],['passed','Passed'],['breached','Breached'],['closed','Closed']].map(([k,v])=>`<option value="${k}"${(a.status||'active')===k?' selected':''}>${v}</option>`).join('')}</select></div>
     </div>
-    <div class="acct-hint">Your firm sets these numbers, so the journal never assumes them &mdash; check them on your firm's dashboard and type what you see. Balance moves forward on its own from here.</div>
+    <details class="acct-more"${a.id&&(a.ddLock||a.hwmOverride||a.consistencyPct)?' open':''}>
+      <summary>Everything else &mdash; filled in from your firm and size, adjust if your account differs</summary>
+      <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">
+        <div class="field"><label>Firm</label><input value="${esc(a.firm||'')}" data-f="firm" list="firmList" placeholder="Take Profit Trader"></div>
+        <div class="field"><label>Account size $</label><input type="number" value="${a.accountSize||''}" data-f="accountSize" placeholder="50000"></div>
+        <div class="field"><label>Phase</label><select data-f="phase"><option value="eval"${a.phase!=='funded'?' selected':''}>Evaluation</option><option value="funded"${a.phase==='funded'?' selected':''}>Funded</option></select></div>
+        <div class="field"><label>Drawdown type</label><select data-f="ddType">${Object.entries(DD_LABELS).map(([k,v])=>`<option value="${k}"${(a.ddType||'static')===k?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Drawdown amount $</label><input type="number" value="${a.ddAmount||''}" data-f="ddAmount" placeholder="2000"></div>
+        <div class="field"><label>Floor stops rising once it reaches $ <span class="fh">optional &mdash; a balance, not a profit amount</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="e.g. 50000 — blank if it never locks"></div>
+        <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
+        <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
+        <div class="field"><label>Min trading days</label><input type="number" value="${a.minDays||''}" data-f="minDays"></div>
+        <div class="field"><label>Consistency max %</label><input type="number" value="${a.consistencyPct||''}" data-f="consistencyPct"></div>
+        <div class="field"><label>High-water mark $ <span class="fh">optional</span></label><input type="number" step="0.01" value="${a.hwmOverride||''}" data-f="hwmOverride" placeholder="from your firm's dashboard"></div>
+        <div class="field"><label>Broker account IDs (comma-sep)</label><input value="${esc(a.brokerIds||'')}" data-f="brokerIds" placeholder="TAKEPROFITPRO243139744"></div>
+        <div class="field"><label>Environment</label><select data-f="env"><option value="demo"${a.env!=='live'?' selected':''}>Demo / Eval</option><option value="live"${a.env==='live'?' selected':''}>Live</option></select></div>
+        <div class="field"><label>Status</label><select data-f="status">${[['active','Active'],['passed','Passed'],['breached','Breached'],['closed','Closed']].map(([k,v])=>`<option value="${k}"${(a.status||'active')===k?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Tradovate username</label><input value="${esc(a.tvUser||'')}" data-f="tvUser" autocomplete="off"></div>
+        <div class="field"><label>Tradovate password ${a.hasCredentials?'(saved)':''}</label><input type="password" data-f="tvPass" placeholder="${a.hasCredentials?'••••••••':''}" autocomplete="new-password"></div>
+      </div>
+      <div class="acct-hint">These are SOA's reference numbers for each firm and size. Firms change their terms, so if your dashboard says something different, yours wins &mdash; edit it here.</div>
+    </details>
     <datalist id="firmList">${FIRM_PRESETS.map(f=>`<option value="${f.name}">`).join('')}</datalist>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
       <button class="btn-primary" onclick="saveAcct(this,${idp})">${a.id?'Save changes':'Add account'}</button>
-      ${a.id?`<button class="btn-sm" onclick="syncAcct(this,${a.id})">Sync from Tradovate</button><button class="btn-sm" style="color:var(--red)" onclick="delAcct(${a.id})">Delete</button><span style="font-size:11px;color:var(--text-muted)">${a.lastSync?'Last sync '+fD(a.lastSync):'Never synced'}</span>`:''}
+      ${a.id?`<button class="btn-sm" onclick="syncAcct(this,${a.id})">Sync from Tradovate</button><button class="btn-sm" style="color:var(--red)" onclick="delAcct(${a.id})">Delete</button>`:''}
       <span class="acct-msg" style="font-size:12px;color:var(--text-muted)"></span>
     </div>
   </div>`;
 }
+
+// Clicking a Firm / Size / Phase chip fills the detail fields in below. It only
+// ever writes into visible, editable inputs — the trader can see and change every
+// number before saving, and nothing is applied that they cannot check.
+function qsPick(btn,kind,val){
+  const card=btn.closest('.acct-card');
+  btn.parentNode.querySelectorAll('.qs-chip').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  const rows=[...card.querySelectorAll('.qs-row')];
+  const readRow=i=>{const c=rows[i].querySelector('.qs-chip.active');return c?c.textContent.trim():''};
+  const firm=kind==='firm'?val:readRow(0);
+  const sizeTxt=kind==='size'?null:readRow(1);
+  const size=kind==='size'?val:(sizeTxt?parseFloat(sizeTxt.replace(/[$k]/g,''))*1000:0);
+  const phase=kind==='phase'?val:(readRow(2)==='Funded'?'funded':readRow(2)?'eval':'');
+  const set=(f,v)=>{const el=card.querySelector('[data-f="'+f+'"]');if(el&&v!==undefined&&v!==null)el.value=v};
+  if(firm)set('firm',firm);
+  if(size)set('accountSize',size);
+  if(phase)set('phase',phase);
+  const out=card.querySelector('[data-qs-out]');
+  if(!(firm&&size&&phase)){if(out)out.textContent='Pick all three and the targets, drawdown and trading-day minimum fill in for you.';return}
+  const r=presetFor(firm,size,phase);
+  const nameEl=card.querySelector('[data-f="name"]');
+  if(nameEl&&!nameEl.value)nameEl.value=(FIRM_SHORT[firm]||firm)+' '+(size/1000)+'k'+(phase==='funded'?' funded':'');
+  set('ddType',r.ddType);set('ddAmount',r.ddAmount);set('ddLock',r.ddLock||'');
+  set('profitTarget',r.profitTarget||'');set('payoutMin',r.payoutMin||'');set('minDays',r.minDays);
+  if(out)out.innerHTML=r.summary;
+}
+
 function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct','accountSize','anchorBalance','ddAmount','ddLock','hwmOverride'].forEach(k=>o[k]=Number(o[k])||0);return o}
 function saveAcct(btn,id){const card=btn.closest('.acct-card');const o=readAcctForm(card);if(id)o.id=parseInt(id);const msg=card.querySelector('.acct-msg');msg.textContent='Saving...';api('POST','/api/accounts',o).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];msg.textContent='Saved';refreshAcctSwitch();setTimeout(()=>ren(),400)}).catch(e=>{msg.textContent=e.message})}
 function delAcct(id){if(!confirm('Delete this account? Its trades stay but become unassigned.'))return;api('DELETE','/api/accounts/'+id).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];_allTrades.forEach(t=>{if(t.accountId===id)t.accountId=null});if(curAccount===id)setAccount('');else ren()}).catch(e=>alert(e.message))}
