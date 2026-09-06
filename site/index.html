@@ -375,15 +375,6 @@ input,select,textarea,button{font-family:inherit;outline:none}
 /* ═══ ACCOUNTS ═══ */
 .acct-switch{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:12.5px;padding:6px 10px;max-width:190px}
 .acct-card{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px}
-.payout-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px}
-.payout-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
-.payout-card.ok{border-color:rgba(111,176,131,.45)}
-.payout-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.payout-name{font-size:13px;font-weight:650}
-.payout-status{font-size:10px;font-weight:700;letter-spacing:.08em}
-.payout-net{font-size:24px;font-weight:650;letter-spacing:-.01em}
-.payout-sub{font-size:11px;color:var(--text-muted);margin:2px 0 10px}
-.payout-check{font-size:12px;color:var(--text-secondary);padding:3px 0}
 
 /* ═══ AI COACH CHAT ═══ */
 .coach{display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;max-width:860px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden}
@@ -1309,7 +1300,7 @@ function buildPayoutTotal(){
     return`<div class="pt-block fade-up">
       <div class="pt-head">
         <div><div class="pt-l">Available to withdraw</div><div class="pt-v">${f$(total)}</div>
-        <div class="pt-s">across ${ready.length} account${ready.length!==1?'s':''}${live.length>ready.length?` · ${live.length-ready.length} not there yet`:''}</div></div>
+        <div class="pt-s">${ready.length===1?esc(ready[0].name):'across '+ready.length+' accounts'}${live.length>ready.length?` · ${live.length-ready.length} not there yet`:''}</div></div>
         <button class="pt-btn" onclick="sv('props')">Prop Firms &rarr;</button>
       </div>
       ${ready.length>1?`<div class="pt-rows">${lines}</div>`:''}
@@ -1417,18 +1408,6 @@ function rDash(el){
     ${buildEdgeWidget(rngT)}
     </div>
     ${buildPayoutTotal()}
-    ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
-      // Rendered from the server's account state — the same numbers the Prop Firms
-      // tab shows. This used to recompute its own totals and drift away from them.
-      const st=acctStatus(a);
-      const head=a.withdrawable!=null?f$(a.withdrawable):(a.balance!=null?f$(a.balance):'Set up');
-      const lbl=a.withdrawable!=null?'Available to withdraw':(a.balance!=null?'Balance':'Needs setup');
-      return`<div class="payout-card${a.payoutEligible?' ok':''}" onclick="sv('props')" style="cursor:pointer">
-        <div class="payout-head"><span class="payout-name">${esc(a.name)}</span><span class="payout-status" style="color:${st.c}">${st.t}</span></div>
-        <div class="payout-net" style="color:${a.withdrawable>0?'var(--green)':'var(--text-primary)'}">${head}</div>
-        <div class="payout-sub">${lbl}${a.room!=null?' · '+f$(a.room)+' to the floor':''}</div>
-        ${(a.payoutChecks||[]).map(c=>`<div class="payout-check"><span style="color:${c.ok?'var(--green)':'var(--text-muted)'}">${c.ok?'✓':'○'}</span> ${esc(c.label)} — ${esc(c.detail)}</div>`).join('')}
-      </div>`}).join('')}</div>`:''}
     <div class="dash-mid">
       <div class="dash-equity fade-up" style="animation-delay:.25s;margin-bottom:0">
         <div class="dash-bottom-title">Equity Curve</div>
