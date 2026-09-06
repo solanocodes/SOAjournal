@@ -38,21 +38,47 @@ async function runSchema(client, sql) {
   return initFailures;
 }
 
+// Tables this app owns, each with a column it must have. This database has been
+// used by something else before: a foreign "accounts" table once aborted every
+// migration in this file, and a foreign "payouts" relation later made
+// CREATE TABLE IF NOT EXISTS a silent no-op, so its indexes had no columns to
+// index and every query against it failed at runtime. A name that is taken by a
+// relation of the wrong shape gets moved aside once — renamed, never dropped, so
+// whatever is in there survives — and this app then creates its own.
+const OWNED_TABLES = [
+  ['users', 'username'], ['trades', 'user_id'], ['daily_journals', 'user_id'],
+  ['badges', 'user_id'], ['milestones', 'user_id'], ['risk_plans', 'user_id'],
+  ['user_settings', 'user_id'], ['coach_messages', 'user_id'], ['coach_memory', 'user_id'],
+  ['accounts', 'user_id'], ['payouts', 'user_id'], ['mentor_notes', 'mentor_id'],
+  ['app_state', 'key']
+];
+
+async function reserveTableNames(client) {
+  for (const [name, mustHave] of OWNED_TABLES) {
+    const rel = await client.query(
+      "SELECT table_type FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1", [name]);
+    if (!rel.rows.length) continue;                       // free, we will create it
+    const col = await client.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2",
+      [name, mustHave]);
+    if (col.rows.length) continue;                        // already ours
+    const isView = rel.rows[0].table_type === 'VIEW';
+    let target = name + '_legacy_backup', n = 1;
+    while ((await client.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1", [target])).rows.length) {
+      target = name + '_legacy_backup_' + (++n);
+    }
+    // Identifiers come from the fixed list above plus a generated suffix.
+    await client.query('ALTER ' + (isView ? 'VIEW' : 'TABLE') + ' "' + name + '" RENAME TO "' + target + '"');
+    console.log('Reserved "' + name + '": a foreign ' + (isView ? 'view' : 'table') +
+      ' held that name without a ' + mustHave + ' column, renamed to "' + target + '"');
+  }
+}
+
 const initDB = async () => {
   const client = await pool.connect();
   try {
-    // A legacy "accounts" table (pre-dating this app's schema, no user_id column)
-    // blocks index creation and aborts the whole init. Move it aside, keep the data.
-    const hasAccounts = await client.query(
-      "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accounts'");
-    if (hasAccounts.rows.length) {
-      const hasUserId = await client.query(
-        "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'user_id'");
-      if (!hasUserId.rows.length) {
-        await client.query('ALTER TABLE accounts RENAME TO accounts_legacy_backup');
-        console.log('Renamed legacy accounts table to accounts_legacy_backup');
-      }
-    }
+    await reserveTableNames(client);
     await runSchema(client, `
       -- Users table
       CREATE TABLE IF NOT EXISTS users (
