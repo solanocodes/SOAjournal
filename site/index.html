@@ -248,6 +248,10 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .acct-more>summary:before{content:'▸ ';font-size:10px}
 .acct-more[open]>summary:before{content:'▾ '}
 .acct-more>summary:hover{color:var(--text-primary)}
+.prop-cash{background:rgba(111,176,131,.09);border:1px solid rgba(111,176,131,.32);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.pc-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
+.pc-v{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em;margin:3px 0 5px}
+.pc-s{font-size:11.5px;color:var(--text-secondary);line-height:1.5}
 .prop-card{margin-bottom:16px}
 .prop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .prop-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -1371,24 +1375,16 @@ function rDash(el){
     ${buildEdgeWidget(rngT)}
     </div>
     ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
-      const at=_allTrades.filter(t=>t.accountId===a.id);
-      if(!at.length&&!a.profitTarget&&!a.payoutMin)return'';
-      const net=at.reduce((x,t)=>x+(t.pnl||0),0);
-      const days=[...new Set(at.map(t=>dKey(t.date)))].filter(Boolean);
-      const byDay={};at.forEach(t=>{const k=dKey(t.date);byDay[k]=(byDay[k]||0)+(t.pnl||0)});
-      const bestDay=Math.max(...Object.values(byDay).concat([0]));
-      const consist=net>0?(bestDay/net*100):0;
-      const target=a.phase==='funded'?(a.payoutMin||0):(a.profitTarget||0);
-      const checks=[];
-      if(target>0)checks.push({ok:net>=target,txt:(a.phase==='funded'?'Payout min ':'Target ')+f$(target)+' — '+(net>=target?'reached':f$(target-net)+' to go')});
-      if(a.minDays>0)checks.push({ok:days.length>=a.minDays,txt:days.length+' / '+a.minDays+' trading days'});
-      if(a.consistencyPct>0&&net>0)checks.push({ok:consist<=a.consistencyPct,txt:'Consistency '+consist.toFixed(0)+'% (max '+a.consistencyPct+'%)'});
-      const eligible=checks.length&&checks.every(c=>c.ok);
-      return`<div class="payout-card${eligible?' ok':''}">
-        <div class="payout-head"><span class="payout-name">${esc(a.name)}</span><span class="payout-status" style="color:${eligible?'var(--green)':'var(--yellow)'}">${eligible?'ELIGIBLE':a.phase==='funded'?'FUNDED':'EVAL'}</span></div>
-        <div class="payout-net" style="color:${net>=0?'var(--green)':'var(--red)'}">${f$(net)}</div>
-        <div class="payout-sub">${at.length} trades · ${days.length} days</div>
-        ${checks.map(c=>`<div class="payout-check"><span style="color:${c.ok?'var(--green)':'var(--text-muted)'}">${c.ok?'✓':'○'}</span> ${c.txt}</div>`).join('')}
+      // Rendered from the server's account state — the same numbers the Prop Firms
+      // tab shows. This used to recompute its own totals and drift away from them.
+      const st=acctStatus(a);
+      const head=a.withdrawable!=null?f$(a.withdrawable):(a.balance!=null?f$(a.balance):'Set up');
+      const lbl=a.withdrawable!=null?'Available to withdraw':(a.balance!=null?'Balance':'Needs setup');
+      return`<div class="payout-card${a.payoutEligible?' ok':''}" onclick="sv('props')" style="cursor:pointer">
+        <div class="payout-head"><span class="payout-name">${esc(a.name)}</span><span class="payout-status" style="color:${st.c}">${st.t}</span></div>
+        <div class="payout-net" style="color:${a.withdrawable>0?'var(--green)':'var(--text-primary)'}">${head}</div>
+        <div class="payout-sub">${lbl}${a.room!=null?' · '+f$(a.room)+' to the floor':''}</div>
+        ${(a.payoutChecks||[]).map(c=>`<div class="payout-check"><span style="color:${c.ok?'var(--green)':'var(--text-muted)'}">${c.ok?'✓':'○'}</span> ${esc(c.label)} — ${esc(c.detail)}</div>`).join('')}
       </div>`}).join('')}</div>`:''}
     <div class="dash-mid">
       <div class="dash-equity fade-up" style="animation-delay:.25s;margin-bottom:0">
@@ -2868,13 +2864,14 @@ function presetFor(firm,size,phase){
     // it stops following, and a payout is available — day one included.
     if(firm==='Take Profit Trader'){
       return{ddType:'intraday',ddAmount:base.dd,ddLock:size,profitTarget:0,payoutMin:base.dd,minDays:0,
-        summary:'<strong>'+f$(base.dd)+'</strong> intraday drawdown. Clear '+f$(base.dd)+' of profit and the floor locks at '+f$(size)+' — you are past IDD and can take a payout, even on day one.'};
+        retainBalance:size+base.dd,
+        summary:'<strong>'+f$(base.dd)+'</strong> intraday drawdown. Clear '+f$(base.dd)+' of profit and the floor locks at '+f$(size)+' — past IDD you can take a payout, even on day one. Anything above '+f$(size+base.dd)+' is withdrawable.'};
     }
-    return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:0,payoutMin:0,minDays:0,
-      summary:'<strong>'+f$(base.dd)+'</strong> drawdown. '+esc(firm)+'’s funded payout terms are not in SOA’s reference set — add your payout minimum and minimum days below.'};
+    return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:0,payoutMin:0,minDays:0,retainBalance:0,
+      summary:'<strong>'+f$(base.dd)+'</strong> drawdown. '+esc(firm)+'’s funded payout terms are not in SOA’s reference set — add your payout minimum and the balance they make you keep in the account below.'};
   }
   const days=EVAL_MIN_DAYS[firm]||0;
-  return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:base.target,payoutMin:0,minDays:days,
+  return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:base.target,payoutMin:0,minDays:days,retainBalance:0,
     summary:'Pass with <strong>'+f$(base.target)+'</strong> profit without losing '+f$(base.dd)+', over at least <strong>'+days+' trading day'+(days===1?'':'s')+'</strong>.'};
 }
 
@@ -2945,11 +2942,18 @@ function propCard(a,i){
     h+='<div class="prop-opt">Tracking. Add your <strong>'+a.niceToHave.map(esc).join(' and ')+'</strong> for a sharper read.</div>';
   }
 
+  if(a.withdrawable!=null){
+    h+='<div class="prop-cash"><div class="pc-l">Available to withdraw today</div>'+
+       '<div class="pc-v" style="color:'+(a.withdrawable>0?'var(--green)':'var(--text-muted)')+'">'+f$(a.withdrawable)+'</div>'+
+       '<div class="pc-s">'+(a.withdrawable>0
+         ? 'Taking it leaves '+f$(a.retainBalance)+' in the account — the balance '+esc(a.firm||'your firm')+' makes you keep.'
+         : 'You are '+f$(a.retainBalance-a.balance)+' below the '+f$(a.retainBalance)+' this firm makes you keep, so nothing can come out yet.')+'</div></div>';
+  }
   h+='<div class="prop-nums">'+
      '<div><span class="pn-l">Balance</span><span class="pn-v">'+money(a.balance)+'</span></div>'+
-     '<div><span class="pn-l">Drawdown floor</span><span class="pn-v">'+money(a.floor)+'</span></div>'+
+     '<div><span class="pn-l">Profit on account</span><span class="pn-v" style="color:'+(a.accountProfit>=0?'var(--green)':'var(--red)')+'">'+(a.balance==null?'&mdash;':f$(a.accountProfit))+'</span></div>'+
      '<div><span class="pn-l">Room to floor</span><span class="pn-v" style="color:'+(a.room==null?'var(--text-primary)':a.room<=0?'var(--red)':a.room<=dayCap?'var(--red)':'var(--green)')+'">'+money(a.room)+'</span></div>'+
-     '<div><span class="pn-l">P&L since '+(a.anchorDate?fD(a.anchorDate):'start')+'</span><span class="pn-v" style="color:'+(a.tradePnl>=0?'var(--green)':'var(--red)')+'">'+f$(a.tradePnl)+'</span></div>'+
+     '<div><span class="pn-l">Drawdown floor</span><span class="pn-v">'+money(a.floor)+'</span></div>'+
      '</div>';
 
   if(roomPct!=null){
@@ -3016,6 +3020,11 @@ function simWithdraw(id){
   const after=a.balance-amt, room=after-a.floor;
   const dayCap=(_cachedRiskPlan&&_cachedRiskPlan.maxLossPerDay)||0;
   let verdict,color;
+  if(a.retainBalance>0&&after<a.retainBalance){
+    out.innerHTML='<span style="color:var(--red)">Balance '+f$(after)+' — below the '+f$(a.retainBalance)+
+      ' '+esc(a.firm||'your firm')+' makes you keep. Most you can take today is '+f$(a.withdrawable||0)+'.</span>';
+    return;
+  }
   if(room<=0){verdict='breaches the account immediately';color='var(--red)'}
   else if(dayCap>0&&room<=dayCap){verdict='leaves '+f$(room)+' — one max-loss day ('+f$(dayCap)+') breaches it';color='var(--red)'}
   else if(dayCap>0&&room<=dayCap*2){verdict='leaves '+f$(room)+' — under two max-loss days of room';color='var(--yellow)'}
@@ -3075,6 +3084,7 @@ function renderAcctForm(a){
         <div class="field"><label>Floor stops rising once it reaches $ <span class="fh">optional &mdash; a balance, not a profit amount</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="e.g. 50000 — blank if it never locks"></div>
         <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
         <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
+        <div class="field"><label>Must keep balance above $ <span class="fh">what the firm makes you leave in</span></label><input type="number" step="0.01" value="${a.retainBalance||''}" data-f="retainBalance" placeholder="52000"></div>
         <div class="field"><label>Min trading days</label><input type="number" value="${a.minDays||''}" data-f="minDays"></div>
         <div class="field"><label>Consistency max %</label><input type="number" value="${a.consistencyPct||''}" data-f="consistencyPct"></div>
         <div class="field"><label>High-water mark $ <span class="fh">optional</span></label><input type="number" step="0.01" value="${a.hwmOverride||''}" data-f="hwmOverride" placeholder="from your firm's dashboard"></div>
@@ -3119,10 +3129,11 @@ function qsPick(btn,kind,val){
   if(nameEl&&!nameEl.value)nameEl.value=(FIRM_SHORT[firm]||firm)+' '+(size/1000)+'k'+(phase==='funded'?' funded':'');
   set('ddType',r.ddType);set('ddAmount',r.ddAmount);set('ddLock',r.ddLock||'');
   set('profitTarget',r.profitTarget||'');set('payoutMin',r.payoutMin||'');set('minDays',r.minDays);
+  set('retainBalance',r.retainBalance||'');
   if(out)out.innerHTML=r.summary;
 }
 
-function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct','accountSize','anchorBalance','ddAmount','ddLock','hwmOverride'].forEach(k=>o[k]=Number(o[k])||0);return o}
+function readAcctForm(card){const o={};card.querySelectorAll('[data-f]').forEach(i=>{o[i.dataset.f]=i.value});['profitTarget','payoutMin','minDays','consistencyPct','accountSize','anchorBalance','ddAmount','ddLock','hwmOverride','retainBalance'].forEach(k=>o[k]=Number(o[k])||0);return o}
 function saveAcct(btn,id){const card=btn.closest('.acct-card');const o=readAcctForm(card);if(id)o.id=parseInt(id);const msg=card.querySelector('.acct-msg');msg.textContent='Saving...';api('POST','/api/accounts',o).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];msg.textContent='Saved';refreshAcctSwitch();setTimeout(()=>ren(),400)}).catch(e=>{msg.textContent=e.message})}
 function delAcct(id){if(!confirm('Delete this account? Its trades stay but become unassigned.'))return;api('DELETE','/api/accounts/'+id).then(()=>api('GET','/api/accounts')).then(d=>{_accounts=d||[];_allTrades.forEach(t=>{if(t.accountId===id)t.accountId=null});if(curAccount===id)setAccount('');else ren()}).catch(e=>alert(e.message))}
 function syncAcct(btn,id){const card=btn.closest('.acct-card');const msg=card.querySelector('.acct-msg');msg.textContent='Syncing with Tradovate...';btn.disabled=true;api('POST','/api/accounts/'+id+'/sync',{}).then(d=>{msg.textContent='Imported '+d.imported+' new trade'+(d.imported!==1?'s':'')+' ('+d.matched+' matched)';return loadAllData()}).then(()=>{setTimeout(()=>ren(),900)}).catch(e=>{msg.textContent=e.message;btn.disabled=false})}
