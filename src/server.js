@@ -860,6 +860,8 @@ async function coachTool(name, input, userId) {
       balance: a.balance,
       balance_note: a.balance === null ? 'Not set — the trader has not entered a current balance for this account.' : 'As of ' + (a.anchorDate || 'anchor') + ' plus ' + a.tradeCount + ' logged trades.',
       pnl_since_anchor: a.tradePnl, withdrawn_since_anchor: a.withdrawn,
+      profit_on_account: a.accountProfit,
+      profit_note: a.profitFromAnchorOnly ? 'Only P&L since the anchor is known — the account size or balance is not set, so total account profit cannot be computed.' : 'Balance minus the account size, which is what the firm measures a payout against.',
       drawdown_type: a.ddAmount > 0 ? a.ddType : null,
       drawdown_amount: a.ddAmount || null,
       drawdown_floor: a.floor,
@@ -1148,10 +1150,17 @@ async function computeAccounts(userId) {
     const byDayPnl = {};
     mine.forEach(t => { const k = normDateStr(t.date); byDayPnl[k] = (byDayPnl[k] || 0) + parseFloat(t.pnl || 0); });
     const bestDay = Math.max(0, ...Object.values(byDayPnl));
+    // A firm measures progress from where the ACCOUNT started, not from where the
+    // trader happened to start journaling. When both the balance and the nominal
+    // size are known that is balance - size; otherwise all we have is P&L since
+    // the anchor, which understates a trader who anchored mid-run.
+    const accountProfit = (balance !== null && a.accountSize > 0) ? balance - a.accountSize : tradePnl;
+    const profitFromAnchorOnly = !(balance !== null && a.accountSize > 0);
     const target = a.phase === 'funded' ? a.payoutMin : a.profitTarget;
     const checks = [];
     if (target > 0) checks.push({ label: (a.phase === 'funded' ? 'Payout minimum' : 'Profit target') + ' $' + target,
-      ok: tradePnl >= target, detail: tradePnl >= target ? 'reached' : '$' + (target - tradePnl).toFixed(2) + ' to go' });
+      ok: accountProfit >= target,
+      detail: accountProfit >= target ? 'reached — up $' + accountProfit.toFixed(2) : '$' + (target - accountProfit).toFixed(2) + ' to go' });
     if (a.minDays > 0) checks.push({ label: 'Minimum trading days', ok: days.length >= a.minDays, detail: days.length + ' of ' + a.minDays });
     if (a.consistencyPct > 0 && tradePnl > 0) {
       const consist = bestDay / tradePnl * 100;
@@ -1169,6 +1178,7 @@ async function computeAccounts(userId) {
 
     return Object.assign(a, {
       balance, tradePnl: Math.round(tradePnl * 100) / 100, withdrawn,
+      accountProfit: Math.round(accountProfit * 100) / 100, profitFromAnchorOnly,
       tradeCount: mine.length, tradingDays: days.length,
       highWaterMark: hwm, hwmSource, floor, room, initialFloor, floorLocked, lockIgnored,
       payoutChecks: checks,
