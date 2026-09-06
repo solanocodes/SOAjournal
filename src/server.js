@@ -863,6 +863,7 @@ async function coachTool(name, input, userId) {
       drawdown_type: a.ddAmount > 0 ? a.ddType : null,
       drawdown_amount: a.ddAmount || null,
       drawdown_floor: a.floor,
+      floor_note: a.lockIgnored ? 'The trader entered a "stops trailing at" level below where this drawdown starts, which cannot be right; it is being ignored. Tell them to check that field.' : a.floorLocked ? 'The floor has stopped rising — it is locked at the level the trader entered.' : undefined,
       room_to_floor: a.room,
       high_water_mark: a.highWaterMark,
       hwm_note: a.hwmSource === 'closed-trades' ? 'Computed from closed trades only, so it is a LOWER bound — the real peak may be higher and the real room smaller.' : a.hwmSource === 'entered' ? 'Entered by the trader.' : 'Unknown.',
@@ -1118,14 +1119,26 @@ async function computeAccounts(userId) {
       hwmSource = 'closed-trades';
     }
 
-    // Floor. Static sits under the account's nominal size; trailing follows the
-    // high-water mark and, on firms that lock it, stops rising at ddLock.
-    let floor = null;
+    // Floor. A drawdown starts one drawdown-amount below the account's nominal
+    // size; a static one stays there, a trailing one follows the high-water mark
+    // upward and, on firms that lock it, stops rising at ddLock.
+    //
+    // Two invariants, because getting these wrong understates the floor and so
+    // overstates how much room a trader has:
+    //   - a trailing floor only ever moves UP, never below where it started;
+    //   - ddLock caps how high the floor rises, so a lock at or below the
+    //     starting floor is meaningless and is ignored rather than applied.
+    const initialFloor = a.accountSize > 0 ? a.accountSize - a.ddAmount : null;
+    let floor = null, floorLocked = false, lockIgnored = false;
     if (a.ddAmount > 0) {
-      if (a.ddType === 'static') { if (a.accountSize > 0) floor = a.accountSize - a.ddAmount; }
-      else if (hwm !== null) {
-        floor = hwm - a.ddAmount;
-        if (a.ddLock > 0) floor = Math.min(floor, a.ddLock);
+      if (a.ddType === 'static') floor = initialFloor;
+      else if (hwm !== null && initialFloor !== null) {
+        floor = Math.max(hwm - a.ddAmount, initialFloor);
+        if (a.ddLock > 0) {
+          if (a.ddLock > initialFloor) {
+            if (a.ddLock < floor) { floor = a.ddLock; floorLocked = true; }
+          } else lockIgnored = true;
+        }
       }
     }
     const room = (balance !== null && floor !== null) ? balance - floor : null;
@@ -1149,7 +1162,7 @@ async function computeAccounts(userId) {
     const missing = [];
     if (!anchored) missing.push('current balance');
     if (!(a.ddAmount > 0)) missing.push('drawdown limit');
-    if (a.ddType === 'static' && !(a.accountSize > 0)) missing.push('account size');
+    if (!(a.accountSize > 0)) missing.push('account size');
     const optional = [];
     if (!(target > 0)) optional.push(a.phase === 'funded' ? 'payout minimum' : 'profit target');
     if (a.ddType !== 'static' && a.hwmOverride <= 0) optional.push('high-water mark from your firm');
@@ -1157,7 +1170,7 @@ async function computeAccounts(userId) {
     return Object.assign(a, {
       balance, tradePnl: Math.round(tradePnl * 100) / 100, withdrawn,
       tradeCount: mine.length, tradingDays: days.length,
-      highWaterMark: hwm, hwmSource, floor, room,
+      highWaterMark: hwm, hwmSource, floor, room, initialFloor, floorLocked, lockIgnored,
       payoutChecks: checks,
       payoutEligible: checks.length > 0 && checks.every(c => c.ok),
       needsSetup: missing, niceToHave: optional
