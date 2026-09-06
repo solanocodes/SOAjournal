@@ -1165,6 +1165,18 @@ async function computeAccounts(userId) {
   });
 }
 
+// The server accepts traffic before initDB finishes — deliberate, because
+// Railway's healthcheck used to crash-loop the container otherwise. So during a
+// deploy that adds a table or column, a request can land before the migration
+// runs. That is temporary and must not be reported to the trader as lost data.
+function migrating(err, res) {
+  if (!dbReady && (err.code === '42P01' || err.code === '42703')) {
+    res.status(503).json({ error: 'The journal is finishing an update — this clears in a few seconds.', updating: true });
+    return true;
+  }
+  return false;
+}
+
 const DD_TYPES = ['static', 'eod', 'intraday'];
 const ACCT_STATUS = ['active', 'passed', 'breached', 'closed'];
 
@@ -1172,7 +1184,8 @@ app.get('/api/payouts', authMiddleware, async (req, res) => {
   try {
     const rows = (await pool.query('SELECT * FROM payouts WHERE user_id = $1 ORDER BY date DESC, id DESC', [req.user.id])).rows;
     res.json(rows.map(r => ({ id: r.id, accountId: r.account_id, date: r.date, amount: parseFloat(r.amount), note: r.note || '' })));
-  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (migrating(err, res)) return; console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/payouts', authMiddleware, async (req, res) => {
@@ -1188,20 +1201,23 @@ app.post('/api/payouts', authMiddleware, async (req, res) => {
       'INSERT INTO payouts (user_id, account_id, date, amount, note) VALUES ($1,$2,$3,$4,$5) RETURNING id',
       [req.user.id, p.accountId, p.date, amt, p.note || '']);
     res.json({ success: true, id: r.rows[0].id });
-  } catch (err) { console.error('Payout save error:', err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (migrating(err, res)) return; console.error('Payout save error:', err); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.delete('/api/payouts/:id', authMiddleware, async (req, res) => {
   try {
     await pool.query('DELETE FROM payouts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     res.json({ success: true });
-  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (migrating(err, res)) return; console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.get('/api/accounts', authMiddleware, async (req, res) => {
   try {
     res.json(await computeAccounts(req.user.id));
-  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (migrating(err, res)) return; console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/accounts', authMiddleware, async (req, res) => {
@@ -1235,7 +1251,8 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
          a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active']);
       res.json({ success: true, id: r.rows[0].id });
     }
-  } catch (err) { console.error('Account save error:', err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (migrating(err, res)) return; console.error('Account save error:', err); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.delete('/api/accounts/:id', authMiddleware, async (req, res) => {
