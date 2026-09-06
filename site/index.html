@@ -248,6 +248,18 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .acct-more>summary:before{content:'▸ ';font-size:10px}
 .acct-more[open]>summary:before{content:'▾ '}
 .acct-more>summary:hover{color:var(--text-primary)}
+.pt-block{background:rgba(111,176,131,.09);border:1px solid rgba(111,176,131,.32);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
+.pt-block.flat{background:var(--bg-card);border-color:var(--border)}
+.pt-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.pt-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
+.pt-v{font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--green);margin:2px 0 4px}
+.pt-v.flat{color:var(--text-muted)}
+.pt-s{font-size:11.5px;color:var(--text-secondary)}
+.pt-btn{background:transparent;border:1px solid var(--border);color:var(--text-primary);font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.pt-btn:hover{border-color:var(--accent);color:var(--accent)}
+.pt-rows{margin-top:12px;padding-top:11px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.pt-row{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--text-secondary)}
+.pt-row span:last-child{font-family:var(--mono);color:var(--text-primary)}
 .prop-cash{background:rgba(111,176,131,.09);border:1px solid rgba(111,176,131,.32);border-radius:11px;padding:14px 16px;margin-bottom:14px}
 .pc-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
 .pc-v{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em;margin:3px 0 5px}
@@ -1283,6 +1295,36 @@ function rangeBarHTML(){
   </div>`;
 }
 // ─── DASHBOARD ───
+// Money you could actually take off the table right now, summed across every
+// account. Only accounts whose firm-retained balance is known contribute, so an
+// evaluation — which cannot pay out — never counts, and a trader who has not set
+// this up sees nothing at all rather than a misleading zero.
+function buildPayoutTotal(){
+  const live=(_accounts||[]).filter(a=>a.withdrawable!=null&&a.status==='active');
+  if(!live.length)return'';
+  const ready=live.filter(a=>a.withdrawable>0).sort((x,y)=>y.withdrawable-x.withdrawable);
+  const total=ready.reduce((s,a)=>s+a.withdrawable,0);
+  if(total>0){
+    const lines=ready.map(a=>`<div class="pt-row"><span>${esc(a.name)}</span><span>${f$(a.withdrawable)}</span></div>`).join('');
+    return`<div class="pt-block fade-up">
+      <div class="pt-head">
+        <div><div class="pt-l">Available to withdraw</div><div class="pt-v">${f$(total)}</div>
+        <div class="pt-s">across ${ready.length} account${ready.length!==1?'s':''}${live.length>ready.length?` · ${live.length-ready.length} not there yet`:''}</div></div>
+        <button class="pt-btn" onclick="sv('props')">Prop Firms &rarr;</button>
+      </div>
+      ${ready.length>1?`<div class="pt-rows">${lines}</div>`:''}
+    </div>`;
+  }
+  // Set up, but nothing clears its buffer yet — show the closest one to it.
+  const near=live.map(a=>({n:a.name,gap:a.retainBalance-a.balance})).sort((x,y)=>x.gap-y.gap)[0];
+  return`<div class="pt-block flat fade-up">
+    <div class="pt-head">
+      <div><div class="pt-l">Available to withdraw</div><div class="pt-v flat">${f$(0)}</div>
+      <div class="pt-s">${esc(near.n)} is ${f$(near.gap)} from its payout buffer</div></div>
+      <button class="pt-btn" onclick="sv('props')">Prop Firms &rarr;</button>
+    </div>
+  </div>`;
+}
 function buildMiniCal(){
   const n=new Date();const y=n.getFullYear(),m=n.getMonth();
   const days=new Date(y,m+1,0).getDate();const sd=new Date(y,m,1).getDay();
@@ -1374,6 +1416,7 @@ function rDash(el){
     </div>
     ${buildEdgeWidget(rngT)}
     </div>
+    ${buildPayoutTotal()}
     ${_accounts.length?`<div class="payout-row">${_accounts.map(a=>{
       // Rendered from the server's account state — the same numbers the Prop Firms
       // tab shows. This used to recompute its own totals and drift away from them.
