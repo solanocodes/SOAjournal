@@ -181,6 +181,31 @@ const initDB = async () => {
       -- Account link on trades (added later, safe to re-run)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS account_id INTEGER;
 
+      -- Prop firm account state (added later, safe to re-run).
+      -- account_size is the nominal size (50000) and fixes a STATIC drawdown floor.
+      -- anchor_balance/anchor_date are the "balance as of" marker the balance is
+      -- computed forward from; a CSV only ever covers part of an account's life.
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_size DECIMAL(12,2) DEFAULT 0;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS anchor_balance DECIMAL(12,2) DEFAULT 0;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS anchor_date VARCHAR(20) DEFAULT '';
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dd_type VARCHAR(20) DEFAULT 'static';
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dd_amount DECIMAL(12,2) DEFAULT 0;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dd_lock DECIMAL(12,2) DEFAULT 0;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS hwm_override DECIMAL(12,2) DEFAULT 0;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+
+      -- Money taken off an account. A payout lowers the balance but never the
+      -- drawdown floor, which is exactly what makes withdrawals risky.
+      CREATE TABLE IF NOT EXISTS payouts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        account_id INTEGER,
+        date VARCHAR(20) NOT NULL,
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Manual day entries: a day recorded without executions (blown account, missing export)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS manual_day BOOLEAN DEFAULT FALSE;
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_count INTEGER;
@@ -213,6 +238,8 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_coach_memory_user ON coach_memory(user_id);
       CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
       CREATE INDEX IF NOT EXISTS idx_trades_account ON trades(account_id);
+      CREATE INDEX IF NOT EXISTS idx_payouts_user ON payouts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_payouts_account ON payouts(account_id);
     `);
     console.log('Database initialized successfully');
   } catch (err) {

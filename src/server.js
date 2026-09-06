@@ -699,7 +699,7 @@ SOA system context: strategies are SOA Levels, Fibonacci Golden Pocket, GP Clust
 You have tools that query the trader's REAL data. Rules for you:
 - ALWAYS use tools before making any claim about their performance. Never invent or estimate statistics — cite exact figures from tool results.
 - Use run_counterfactual to turn advice into dollars ("stopping at 3 trades/day would have made you $X more").
-- Use remember(kind, content) to save durable facts the trader tells you or commits to. kinds: profile (who they are, account situation), playbook (their entry model / trading rules), commitment (things they commit to doing), flag (patterns you have flagged), question (open questions like withdrawal timing). Save conclusions, not chit-chat. Keep each memory under 200 characters.
+- Use remember(kind, content) for behaviour only — commitments, patterns, things they keep doing. Numbers that change (balances, account sizes, drawdown limits, payout thresholds) must never go in memory; read them from get_accounts and get_risk_plan every time, or you will quote a stale figure back as fact months later. Save durable facts the trader tells you or commits to. kinds: profile (who they are, account situation), playbook (their entry model / trading rules), commitment (things they commit to doing), flag (patterns you have flagged), question (open questions like withdrawal timing). Save conclusions, not chit-chat. Keep each memory under 200 characters.
 - When your memory holds commitments, check them against real data and open with receipts when relevant — the trader asked you to hold them accountable.
 - If the user attaches a chart image: analyze it conservatively. Describe only what is clearly visible. Never invent price levels or indicator values you cannot see. State uncertainty plainly. If trade metadata is provided, critique the specific trade against the SOA system.
 
@@ -710,6 +710,8 @@ DOCUMENTS: when the trader attaches a document, it is teach-the-coach material �
 DAILY DEBRIEF: this is how the trader journals. When they want to talk about their day (or tap "Debrief my day"), first pull today's trades with query_trades for today's date and check get_journal_entries for today and open with a tight recap — P&L, what stands out, any rule breaks you can see. Then guide a short conversation, ONE question per message, about 3-5 exchanges: how the day actually felt (map what they say onto the allowed emotion terms), what was driving any bad decisions (map onto the allowed bias terms), the one lesson worth keeping, and tomorrow's plan. As you learn things, call save_journal to write their daily journal — you may call it multiple times as the picture fills in; it merges. When the debrief winds down, confirm plainly: "I've written today's journal — satisfaction X, [emotions], and your lesson is logged." Rate satisfaction 1-5 from how they describe the day (discipline quality, not just P&L). If they debrief a past day, use that date.
 
 INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
+
+ACCOUNTS AND MONEY: get_accounts is the only thing that knows which accounts this trader has. Call it before you say anything about an account, a balance, a drawdown limit, a buffer or a withdrawal — including when you think you already know. Never name an account, a size or a balance that is not in the result you just got back; if the list is empty they have no accounts set up, and that is the answer. When a field comes back null it is NOT SET: say which number you are missing and ask for it or point them at the Prop Firms tab. Never fill the gap with what a firm "typically" requires — being wrong about a drawdown limit can cost someone a funded account, and a stated guess is worse than an admitted blank. Balances computed from closed trades cannot see intraday peaks, so when the tool flags a high-water mark as a lower bound, treat the room to the floor as the best case and say so. Never give a pull-the-money verdict you would have to walk back one message later: if a number you need is missing, get it first.
 
 DATES: all dates are US Eastern trading days. The conversation history can span several days and is marked with session dates — never assume the last thing discussed was today. Before saying a journal already exists for today, confirm it with get_journal_entries for today's date rather than relying on the conversation. "Today" is the date given in the trader snapshot below — trust it over any other notion of the current date, and use it when calling save_journal for today's debrief.
 
@@ -746,7 +748,9 @@ const COACH_TOOLS = [
       observations: { type: 'string', description: 'Market/behavior observations from the debrief' },
       gameplan: { type: 'string', description: 'Tomorrow\'s plan' }
     }, required: ['date'] } },
-  { name: 'remember', description: 'Save a durable fact about this trader to your long-term memory.',
+  { name: 'get_accounts', description: 'The trader\'s prop firm accounts with live balances, drawdown floors, room to the floor and payout progress. This is the ONLY source of truth about which accounts exist and what they are worth. Call it before answering anything about accounts, balances, drawdown, buffers or withdrawals. If it returns an empty list the trader has no accounts set up — say so; never infer an account from anything else.',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'remember', description: 'Save a durable BEHAVIOURAL fact about this trader — a commitment they made, a pattern you noticed, a rule they keep breaking, a question to revisit. Never store numbers that change: balances, account sizes, drawdown limits, buffers and payout thresholds live in get_accounts and get_risk_plan, and a stale copy here would be quoted back as fact forever.',
     input_schema: { type: 'object', properties: {
       kind: { type: 'string', enum: ['profile', 'playbook', 'commitment', 'flag', 'question'] },
       content: { type: 'string' }
@@ -846,6 +850,26 @@ async function coachTool(name, input, userId) {
          lessons=EXCLUDED.lessons, observations=EXCLUDED.observations, gameplan=EXCLUDED.gameplan`,
       [userId, d, sat, emo, bia, les, obs, gp]);
     return { saved: true, date: d };
+  }
+  if (name === 'get_accounts') {
+    const list = await computeAccounts(userId);
+    if (!list.length) return { accounts: [], note: 'This trader has NO prop firm accounts set up. Do not refer to any account, size or balance — tell them to add one in the Prop Firms tab.' };
+    return { accounts: list.map(a => ({
+      name: a.name, firm: a.firm || null, phase: a.phase, status: a.status,
+      account_size: a.accountSize || null,
+      balance: a.balance,
+      balance_note: a.balance === null ? 'Not set — the trader has not entered a current balance for this account.' : 'As of ' + (a.anchorDate || 'anchor') + ' plus ' + a.tradeCount + ' logged trades.',
+      pnl_since_anchor: a.tradePnl, withdrawn_since_anchor: a.withdrawn,
+      drawdown_type: a.ddAmount > 0 ? a.ddType : null,
+      drawdown_amount: a.ddAmount || null,
+      drawdown_floor: a.floor,
+      room_to_floor: a.room,
+      high_water_mark: a.highWaterMark,
+      hwm_note: a.hwmSource === 'closed-trades' ? 'Computed from closed trades only, so it is a LOWER bound — the real peak may be higher and the real room smaller.' : a.hwmSource === 'entered' ? 'Entered by the trader.' : 'Unknown.',
+      trading_days: a.tradingDays,
+      payout_checks: a.payoutChecks, payout_eligible: a.payoutEligible,
+      not_set: a.needsSetup, also_not_set: a.niceToHave
+    })), guidance: 'Every number here comes from what the trader entered plus their logged trades. If a field is null it is NOT SET — say so and point them at the Prop Firms tab. Never substitute a typical or industry-standard value for a missing one.' };
   }
   if (name === 'remember') {
     const kinds = ['profile','playbook','commitment','flag','question'];
@@ -1045,13 +1069,138 @@ function acctRow(r) {
     tvUser: r.tv_user, hasCredentials: !!(r.tv_user && r.tv_pass_enc),
     phase: r.phase, profitTarget: parseFloat(r.profit_target), maxDrawdown: parseFloat(r.max_drawdown),
     minDays: r.min_days, consistencyPct: r.consistency_pct, payoutMin: parseFloat(r.payout_min),
+    accountSize: parseFloat(r.account_size || 0), anchorBalance: parseFloat(r.anchor_balance || 0),
+    anchorDate: r.anchor_date || '', ddType: r.dd_type || 'static',
+    ddAmount: parseFloat(r.dd_amount || 0), ddLock: parseFloat(r.dd_lock || 0),
+    hwmOverride: parseFloat(r.hwm_override || 0), status: r.status || 'active',
     lastSync: r.last_sync };
 }
 
+// ═══════════════════════════════════
+// PROP ACCOUNT STATE
+// ═══════════════════════════════════
+// One computation, read by both the Prop Firms tab and Delta's get_accounts tool,
+// so the two can never quote different numbers at the trader.
+//
+// Balance is anchored: a CSV only ever covers part of an account's life, so the
+// trader states the balance as of a date and everything is computed forward from
+// there. Nothing here is ever guessed — a field the trader has not filled in comes
+// back as null and the caller must say it is not set.
+async function computeAccounts(userId) {
+  const [accts, trades, payouts] = await Promise.all([
+    pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY id', [userId]),
+    pool.query('SELECT account_id, date, pnl FROM trades WHERE user_id = $1 ORDER BY date', [userId]),
+    pool.query('SELECT account_id, date, amount FROM payouts WHERE user_id = $1 ORDER BY date', [userId])
+  ]);
+  return accts.rows.map(r => {
+    const a = acctRow(r);
+    const since = a.anchorDate || '';
+    const mine = trades.rows.filter(t => t.account_id === a.id && normDateStr(t.date) >= since);
+    const paid = payouts.rows.filter(p => p.account_id === a.id && String(p.date) >= since);
+    const tradePnl = mine.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
+    const withdrawn = paid.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+
+    const anchored = a.anchorBalance > 0;
+    const balance = anchored ? a.anchorBalance + tradePnl - withdrawn : null;
+
+    // High-water mark from the running balance after each closed trade. We only
+    // have round trips, never tick data, so an intraday peak inside a trade is
+    // invisible: this is a LOWER bound on the true HWM. A trader who reads their
+    // real HWM off the firm's dashboard can override it.
+    let hwm = null, hwmSource = 'none';
+    if (a.hwmOverride > 0) { hwm = a.hwmOverride; hwmSource = 'entered'; }
+    else if (anchored) {
+      const byDay = {};
+      mine.forEach(t => { const k = normDateStr(t.date); byDay[k] = (byDay[k] || 0) + parseFloat(t.pnl || 0); });
+      paid.forEach(p => { const k = String(p.date); byDay[k] = (byDay[k] || 0) - parseFloat(p.amount || 0); });
+      let run = a.anchorBalance; hwm = run;
+      Object.keys(byDay).sort().forEach(k => { run += byDay[k]; if (run > hwm) hwm = run; });
+      hwmSource = 'closed-trades';
+    }
+
+    // Floor. Static sits under the account's nominal size; trailing follows the
+    // high-water mark and, on firms that lock it, stops rising at ddLock.
+    let floor = null;
+    if (a.ddAmount > 0) {
+      if (a.ddType === 'static') { if (a.accountSize > 0) floor = a.accountSize - a.ddAmount; }
+      else if (hwm !== null) {
+        floor = hwm - a.ddAmount;
+        if (a.ddLock > 0) floor = Math.min(floor, a.ddLock);
+      }
+    }
+    const room = (balance !== null && floor !== null) ? balance - floor : null;
+
+    // Payout checks — same rules the dashboard has always used.
+    const days = [...new Set(mine.map(t => normDateStr(t.date)))].filter(Boolean);
+    const byDayPnl = {};
+    mine.forEach(t => { const k = normDateStr(t.date); byDayPnl[k] = (byDayPnl[k] || 0) + parseFloat(t.pnl || 0); });
+    const bestDay = Math.max(0, ...Object.values(byDayPnl));
+    const target = a.phase === 'funded' ? a.payoutMin : a.profitTarget;
+    const checks = [];
+    if (target > 0) checks.push({ label: (a.phase === 'funded' ? 'Payout minimum' : 'Profit target') + ' $' + target,
+      ok: tradePnl >= target, detail: tradePnl >= target ? 'reached' : '$' + (target - tradePnl).toFixed(2) + ' to go' });
+    if (a.minDays > 0) checks.push({ label: 'Minimum trading days', ok: days.length >= a.minDays, detail: days.length + ' of ' + a.minDays });
+    if (a.consistencyPct > 0 && tradePnl > 0) {
+      const consist = bestDay / tradePnl * 100;
+      checks.push({ label: 'Consistency', ok: consist <= a.consistencyPct, detail: consist.toFixed(0) + '% best day (max ' + a.consistencyPct + '%)' });
+    }
+
+    // Split by consequence: without these the risk numbers cannot be computed at all.
+    const missing = [];
+    if (!anchored) missing.push('current balance');
+    if (!(a.ddAmount > 0)) missing.push('drawdown limit');
+    if (a.ddType === 'static' && !(a.accountSize > 0)) missing.push('account size');
+    const optional = [];
+    if (!(target > 0)) optional.push(a.phase === 'funded' ? 'payout minimum' : 'profit target');
+    if (a.ddType !== 'static' && a.hwmOverride <= 0) optional.push('high-water mark from your firm');
+
+    return Object.assign(a, {
+      balance, tradePnl: Math.round(tradePnl * 100) / 100, withdrawn,
+      tradeCount: mine.length, tradingDays: days.length,
+      highWaterMark: hwm, hwmSource, floor, room,
+      payoutChecks: checks,
+      payoutEligible: checks.length > 0 && checks.every(c => c.ok),
+      needsSetup: missing, niceToHave: optional
+    });
+  });
+}
+
+const DD_TYPES = ['static', 'eod', 'intraday'];
+const ACCT_STATUS = ['active', 'passed', 'breached', 'closed'];
+
+app.get('/api/payouts', authMiddleware, async (req, res) => {
+  try {
+    const rows = (await pool.query('SELECT * FROM payouts WHERE user_id = $1 ORDER BY date DESC, id DESC', [req.user.id])).rows;
+    res.json(rows.map(r => ({ id: r.id, accountId: r.account_id, date: r.date, amount: parseFloat(r.amount), note: r.note || '' })));
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/payouts', authMiddleware, async (req, res) => {
+  try {
+    const p = req.body;
+    const amt = parseFloat(p.amount);
+    if (!p.accountId) return res.status(400).json({ error: 'Which account was this taken from?' });
+    if (!isFinite(amt) || amt <= 0) return res.status(400).json({ error: 'Enter an amount greater than zero' });
+    if (!p.date) return res.status(400).json({ error: 'Date required' });
+    const own = (await pool.query('SELECT id FROM accounts WHERE id = $1 AND user_id = $2', [p.accountId, req.user.id])).rows[0];
+    if (!own) return res.status(404).json({ error: 'Account not found' });
+    const r = await pool.query(
+      'INSERT INTO payouts (user_id, account_id, date, amount, note) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+      [req.user.id, p.accountId, p.date, amt, p.note || '']);
+    res.json({ success: true, id: r.rows[0].id });
+  } catch (err) { console.error('Payout save error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/payouts/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM payouts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/accounts', authMiddleware, async (req, res) => {
   try {
-    const rows = (await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY id', [req.user.id])).rows;
-    res.json(rows.map(acctRow));
+    res.json(await computeAccounts(req.user.id));
   } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1065,19 +1214,25 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
       if (!cur) return res.status(404).json({ error: 'Account not found' });
       await pool.query(
         `UPDATE accounts SET name=$1, firm=$2, env=$3, broker_ids=$4, tv_user=$5, tv_pass_enc=$6,
-         phase=$7, profit_target=$8, max_drawdown=$9, min_days=$10, consistency_pct=$11, payout_min=$12
-         WHERE id=$13 AND user_id=$14`,
+         phase=$7, profit_target=$8, max_drawdown=$9, min_days=$10, consistency_pct=$11, payout_min=$12,
+         account_size=$13, anchor_balance=$14, anchor_date=$15, dd_type=$16, dd_amount=$17,
+         dd_lock=$18, hwm_override=$19, status=$20
+         WHERE id=$21 AND user_id=$22`,
         [a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'',
          a.tvPass ? passEnc : cur.tv_pass_enc,
          a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
+         a.accountSize||0, a.anchorBalance||0, a.anchorDate||'', DD_TYPES.includes(a.ddType)?a.ddType:'static',
+         a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active',
          a.id, req.user.id]);
       res.json({ success: true, id: a.id });
     } else {
       const r = await pool.query(
-        `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+        `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min, account_size, anchor_balance, anchor_date, dd_type, dd_amount, dd_lock, hwm_override, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
         [req.user.id, a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'', passEnc,
-         a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0]);
+         a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
+         a.accountSize||0, a.anchorBalance||0, a.anchorDate||'', DD_TYPES.includes(a.ddType)?a.ddType:'static',
+         a.ddAmount||0, a.ddLock||0, a.hwmOverride||0, ACCT_STATUS.includes(a.status)?a.status:'active']);
       res.json({ success: true, id: r.rows[0].id });
     }
   } catch (err) { console.error('Account save error:', err); res.status(500).json({ error: 'Server error' }); }
@@ -1086,6 +1241,7 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
 app.delete('/api/accounts/:id', authMiddleware, async (req, res) => {
   try {
     await pool.query('UPDATE trades SET account_id = NULL WHERE account_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    await pool.query('DELETE FROM payouts WHERE account_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     await pool.query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     res.json({ success: true });
   } catch (err) { console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
