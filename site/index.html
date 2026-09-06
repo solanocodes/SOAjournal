@@ -2893,6 +2893,9 @@ function propCard(a,i){
   if(needs.length){
     h+='<div class="prop-need">Can\'t track this account yet — still need your <strong>'+needs.map(esc).join(', ')+'</strong>. '+
        'Your firm sets those; open Edit account below and type what their dashboard shows.</div>';
+  }else if(a.lockIgnored){
+    h+='<div class="prop-need">Check <strong>&ldquo;floor stops rising once it reaches&rdquo;</strong> &mdash; '+f$(a.ddLock)+
+       ' is below where this drawdown starts ('+f$(a.initialFloor)+'), so it can\'t be a lock level. Ignoring it for now; the numbers below are correct without it.</div>';
   }else if((a.niceToHave||[]).length){
     h+='<div class="prop-opt">Tracking. Add your <strong>'+a.niceToHave.map(esc).join(' and ')+'</strong> for a sharper read.</div>';
   }
@@ -2906,9 +2909,8 @@ function propCard(a,i){
 
   if(roomPct!=null){
     h+='<div class="prop-bar"><div class="prop-bar-fill" style="width:'+roomPct.toFixed(1)+'%;background:'+(a.room<=dayCap&&dayCap>0?'var(--red)':'var(--accent)')+'"></div></div>'+
-       '<div class="prop-bar-cap">'+(a.room>=a.ddAmount
-          ? f$(a.room)+' of room — more than the '+f$(a.ddAmount)+' drawdown, the floor has stopped following you'
-          : f$(a.room)+' left of your '+f$(a.ddAmount)+' drawdown')+
+       '<div class="prop-bar-cap">'+f$(a.room)+' of room'+
+          (a.floorLocked?' — the floor has locked at '+f$(a.floor)+' and stops rising':' against your '+f$(a.ddAmount)+' drawdown')+
        (a.ddType!=='static'&&a.hwmSource==='closed-trades'?' · <span title="We only see closed trades, so an intraday peak inside a trade is invisible. Real room may be smaller.">best case</span>':'')+'</div>';
   }
 
@@ -3014,7 +3016,7 @@ function renderAcctForm(a){
       <div class="field"><label>&hellip; as of</label><input type="date" value="${a.anchorDate||''}" data-f="anchorDate"></div>
       <div class="field"><label>Drawdown type</label><select data-f="ddType">${Object.entries(DD_LABELS).map(([k,v])=>`<option value="${k}"${(a.ddType||'static')===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="field"><label>Drawdown amount $</label><input type="number" value="${a.ddAmount||''}" data-f="ddAmount" placeholder="2000"></div>
-      <div class="field"><label>Stops trailing at $ <span class="fh">optional</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="leave blank if it never locks"></div>
+      <div class="field"><label>Floor stops rising once it reaches $ <span class="fh">optional &mdash; a balance, not a profit amount</span></label><input type="number" value="${a.ddLock||''}" data-f="ddLock" placeholder="e.g. 50000 — blank if it never locks"></div>
       <div class="field"><label>High-water mark $ <span class="fh">optional</span></label><input type="number" step="0.01" value="${a.hwmOverride||''}" data-f="hwmOverride" placeholder="from your firm's dashboard"></div>
       <div class="field"><label>Profit target $</label><input type="number" value="${a.profitTarget||''}" data-f="profitTarget"></div>
       <div class="field"><label>Payout minimum $</label><input type="number" value="${a.payoutMin||''}" data-f="payoutMin"></div>
