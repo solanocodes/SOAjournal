@@ -1239,7 +1239,7 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'props',l:'Prop Firms'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
@@ -1252,7 +1252,7 @@ function viewBanners(){
   }
   return h;
 }
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,props:rProps,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const _mdCount=tr.filter(t=>t.manualDay).reduce((a,t)=>a+((parseInt(t.tradeCount)||1)-1),0);const _pt=tr.filter(t=>!t.manualDay);const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=_pt.filter(t=>t.pnl>0),l=_pt.filter(t=>t.pnl<0);const wr=_pt.length?w.length/_pt.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length+_mdCount,sk,ar,avgEmo,em,st,cv}}
@@ -1301,7 +1301,7 @@ function buildPayoutTotal(){
       <div class="pt-head">
         <div><div class="pt-l">Available to withdraw</div><div class="pt-v">${f$(total)}</div>
         <div class="pt-s">${ready.length===1?esc(ready[0].name):'across '+ready.length+' accounts'}${live.length>ready.length?` · ${live.length-ready.length} not there yet`:''}</div></div>
-        <button class="pt-btn" onclick="sv('props')">Prop Firms &rarr;</button>
+        <button class="pt-btn" onclick="sv('settings')">Accounts &rarr;</button>
       </div>
       ${ready.length>1?`<div class="pt-rows">${lines}</div>`:''}
     </div>`;
@@ -1312,7 +1312,7 @@ function buildPayoutTotal(){
     <div class="pt-head">
       <div><div class="pt-l">Available to withdraw</div><div class="pt-v flat">${f$(0)}</div>
       <div class="pt-s">${esc(near.n)} is ${f$(near.gap)} from its payout buffer</div></div>
-      <button class="pt-btn" onclick="sv('props')">Prop Firms &rarr;</button>
+      <button class="pt-btn" onclick="sv('settings')">Accounts &rarr;</button>
     </div>
   </div>`;
 }
@@ -2929,17 +2929,18 @@ function acctStatus(a){
   return{t:a.phase==='funded'?'FUNDED':'EVAL',c:'var(--text-secondary)'};
 }
 
-function rProps(el){
+// Rendered inside Settings. The dashboard's withdrawable total is the only
+// prop-firm surface a trader needs day to day; the accounts behind it are setup,
+// so they live with the rest of the setup rather than in their own tab.
+function propAccountsHTML(){
   const list=_accounts||[];
-  let h='<h2 style="font-size:20px;font-weight:800;margin-bottom:6px">Prop Firms</h2>'+
-    '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:20px;max-width:640px;line-height:1.6">Where every account actually stands. Imports move the balance forward on their own &mdash; you only enter what no CSV contains: your balance today, and the rules your firm set.</div>';
+  let h='';
   if(!list.length){
-    h+='<div class="empty-state fade-up"><div class="empty-icon">🏦</div><h3 class="empty-title">No accounts yet</h3>'+
-       '<p class="empty-text">Add your first prop account below, or just import a CSV &mdash; the journal will spot the account and offer to set it up.</p></div>';
+    h+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">Track a prop account and the dashboard will show what you can withdraw. Imports move the balance forward on their own &mdash; you only enter what no CSV contains: your balance today, and the rules your firm set.</div>';
   }
   list.forEach((a,i)=>{h+=propCard(a,i)});
-  h+='<div class="card" style="margin-top:18px"><div style="font-size:15px;font-weight:700;margin-bottom:12px">Add an account</div>'+renderAcctForm(null)+'</div>';
-  el.innerHTML=h;
+  h+='<div style="font-size:13px;font-weight:600;margin:16px 0 10px">Add an account</div>'+renderAcctForm(null);
+  return h;
 }
 
 function money(v){return v==null?'&mdash;':f$(v)}
@@ -3026,7 +3027,7 @@ function createAcctFromImport(brokerId){
     env:'demo',phase:'eval',ddType:f?f.ddType:'static'})
     .then(()=>api('GET','/api/accounts')).then(d=>{
       _accounts=d||[];refreshAcctSwitch();
-      alert('Created. Finish the import, then open Prop Firms to add the balance and drawdown — those are the only numbers the CSV cannot tell us.');
+      alert('Created. Finish the import, then open Settings to add the balance and drawdown — those are the only numbers the CSV cannot tell us.');
       if(pendingImports.length)renderImportPreview(pendingImports,1,[]);
     }).catch(e=>alert(e.message));
 }
@@ -3167,9 +3168,8 @@ function rSettings(el){
     <h2 style="font-size:20px;font-weight:800;margin-bottom:24px">Settings</h2>
 
     <div class="card" style="margin-bottom:16px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Trading Accounts</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Accounts, balances, drawdown and payouts now live in the <strong style="color:var(--accent)">Prop Firms</strong> tab.</div>
-      <button class="btn-primary" onclick="sv('props')">Open Prop Firms</button>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Prop Firm Accounts</div>
+      ${propAccountsHTML()}
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -3838,7 +3838,7 @@ function renderImportPreview(rts,fileCount,problems){
   if(gkeys.length>1||gkeys.some(k=>groups[k].matched)){
     h+='<div class="imp-accts">'+gkeys.map(label=>{const g=groups[label];
       return`<div class="imp-acct${g.matched?' ok':''}"><span class="imp-acct-nm">${g.matched?'✓ ':''}${esc(label)}</span><span class="imp-acct-meta">${g.n} trade${g.n!==1?'s':''} · <strong style="color:${g.p>=0?'var(--green)':'var(--red)'}">${f$(g.p)}</strong></span></div>`}).join('')+'</div>';
-    if(gkeys.some(k=>!groups[k].matched))h+='<div class="imp-hint">Unmatched trades import to the account you have selected. To auto-route them, add the broker account ID in the Prop Firms tab.</div>';
+    if(gkeys.some(k=>!groups[k].matched))h+='<div class="imp-hint">Unmatched trades import to the account you have selected. To auto-route them, add the broker account ID in Settings.</div>';
   }
   // An account the journal has never seen. Offer to create it rather than filing
   // the trades away silently — this is where a prop account gets set up.
