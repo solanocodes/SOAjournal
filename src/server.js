@@ -441,6 +441,203 @@ app.post('/api/mentor/reset-password/:id', authMiddleware, mentorOnly, async (re
   } catch (err) { console.error('Mentor reset error:', err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// ═══════════════════════════════════
+// OTS — 90-DAY COHORT SPRINT
+// ═══════════════════════════════════
+// Day numbers come from the cohort's single start date, so day 12 is the same
+// calendar day for every member and the mentor's grid lines up.
+function isoDayDiff(from, to) {
+  const u = d => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  return Math.round((u(to) - u(from)) / 86400000);
+}
+function isoAddDays(from, n) {
+  const d = new Date(Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10)) + n * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+async function otsCohort() {
+  return (await pool.query("SELECT * FROM ots_cohorts WHERE name = 'OTS 1'")).rows[0] || null;
+}
+async function otsMembership(userId) {
+  const c = await otsCohort();
+  if (!c) return { cohort: null, isMember: false };
+  const m = (await pool.query('SELECT 1 FROM ots_members WHERE cohort_id = $1 AND user_id = $2', [c.id, userId])).rows.length > 0;
+  return { cohort: c, isMember: m };
+}
+function otsShape(c) {
+  const today = etTodayStr();
+  const offset = isoDayDiff(c.start_date, today);
+  return {
+    id: c.id, name: c.name, startDate: c.start_date, totalDays: c.total_days,
+    endDate: isoAddDays(c.start_date, c.total_days - 1),
+    today,
+    // Before the start date currentDay is 0 and daysUntilStart counts down.
+    currentDay: offset < 0 ? 0 : Math.min(offset + 1, c.total_days),
+    daysUntilStart: offset < 0 ? -offset : 0,
+    finished: offset + 1 > c.total_days
+  };
+}
+const reflRow = r => ({
+  date: r.date, dayNum: r.day_num, learned: r.learned || '', bringing: r.bringing || '',
+  keptPrior: r.kept_prior, writtenOn: r.written_on || '',
+  late: !!(r.written_on && r.written_on > r.date)
+});
+
+app.get('/api/ots', authMiddleware, async (req, res) => {
+  try {
+    const { cohort, isMember } = await otsMembership(req.user.id);
+    if (!cohort) return res.json({ enrolled: false, cohort: null });
+    if (!isMember && !req.user.is_mentor) return res.json({ enrolled: false, cohort: null });
+    const rows = (await pool.query(
+      'SELECT * FROM ots_reflections WHERE user_id = $1 AND cohort_id = $2 ORDER BY date', [req.user.id, cohort.id])).rows;
+    res.json({ enrolled: isMember, isMentor: !!req.user.is_mentor, cohort: otsShape(cohort), reflections: rows.map(reflRow) });
+  } catch (err) { if (migrating(err, res)) return; console.error('OTS error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/ots/reflection', authMiddleware, async (req, res) => {
+  try {
+    const { cohort, isMember } = await otsMembership(req.user.id);
+    if (!cohort) return res.status(404).json({ error: 'No OTS cohort yet' });
+    if (!isMember) return res.status(403).json({ error: 'You are not in this OTS cohort' });
+    const date = normDateStr(req.body.date || etTodayStr());
+    const day = isoDayDiff(cohort.start_date, date) + 1;
+    if (day < 1) return res.status(400).json({ error: 'That day is before the sprint starts' });
+    if (day > cohort.total_days) return res.status(400).json({ error: 'That day is past the end of the sprint' });
+    if (date > etTodayStr()) return res.status(400).json({ error: 'You cannot reflect on a day that has not happened' });
+    const learned = String(req.body.learned || '').slice(0, 4000);
+    const bringing = String(req.body.bringing || '').slice(0, 4000);
+    if (!learned.trim() && !bringing.trim()) return res.status(400).json({ error: 'Write something in at least one field' });
+    // written_on is kept so a day filled in later is visibly late rather than
+    // quietly passing as done — otherwise the tracker lies about the one thing
+    // it exists to measure.
+    await pool.query(
+      `INSERT INTO ots_reflections (user_id, cohort_id, date, day_num, learned, bringing, kept_prior, written_on)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         learned = EXCLUDED.learned, bringing = EXCLUDED.bringing,
+         kept_prior = EXCLUDED.kept_prior, updated_at = NOW()`,
+      [req.user.id, cohort.id, date, day, learned, bringing,
+       typeof req.body.keptPrior === 'boolean' ? req.body.keptPrior : null, etTodayStr()]);
+    res.json({ success: true, date, dayNum: day });
+  } catch (err) { if (migrating(err, res)) return; console.error('OTS save error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Cohort overview: who has reflected on which day.
+app.get('/api/mentor/ots', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const cohort = await otsCohort();
+    if (!cohort) return res.json({ cohort: null, members: [] });
+    const members = (await pool.query(
+      `SELECT u.id, u.username, u.first_name, u.last_name, m.joined_at
+         FROM ots_members m JOIN users u ON u.id = m.user_id
+        WHERE m.cohort_id = $1 ORDER BY u.username`, [cohort.id])).rows;
+    const refl = (await pool.query(
+      'SELECT user_id, date, day_num, written_on FROM ots_reflections WHERE cohort_id = $1', [cohort.id])).rows;
+    const byUser = {};
+    refl.forEach(r => { (byUser[r.user_id] = byUser[r.user_id] || []).push({ date: r.date, dayNum: r.day_num, late: !!(r.written_on && r.written_on > r.date) }); });
+    res.json({
+      cohort: otsShape(cohort),
+      members: members.map(u => {
+        const days = byUser[u.id] || [];
+        return {
+          id: u.id, username: u.username,
+          fullName: u.first_name && u.last_name ? u.first_name + ' ' + u.last_name : u.username,
+          joinedAt: u.joined_at, done: days.length, late: days.filter(d => d.late).length,
+          days: days.map(d => d.dayNum)
+        };
+      })
+    });
+  } catch (err) { if (migrating(err, res)) return; console.error('Mentor OTS error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// One member, their reflections beside what they actually traded that day.
+app.get('/api/mentor/ots/:userId', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const cohort = await otsCohort();
+    if (!cohort) return res.status(404).json({ error: 'No OTS cohort yet' });
+    const u = (await pool.query('SELECT id, username, first_name, last_name FROM users WHERE id = $1', [req.params.userId])).rows[0];
+    if (!u) return res.status(404).json({ error: 'Student not found' });
+    const [refl, trades, journals] = await Promise.all([
+      pool.query('SELECT * FROM ots_reflections WHERE user_id = $1 AND cohort_id = $2', [u.id, cohort.id]),
+      pool.query('SELECT date, pnl, emotion_rating, rules_followed, strategy FROM trades WHERE user_id = $1', [u.id]),
+      pool.query('SELECT date, satisfaction, lessons, emotions FROM daily_journals WHERE user_id = $1', [u.id])
+    ]);
+    const byDate = {};
+    trades.rows.forEach(t => {
+      const d = normDateStr(t.date);
+      const b = byDate[d] = byDate[d] || { trades: 0, pnl: 0, emo: 0, rules: 0, untagged: 0 };
+      b.trades++; b.pnl += parseFloat(t.pnl || 0); b.emo += (t.emotion_rating || 0);
+      b.rules += (t.rules_followed || []).length;
+      if (!t.strategy || t.strategy === 'No Strategy Used') b.untagged++;
+    });
+    const jByDate = {};
+    journals.rows.forEach(j => { jByDate[normDateStr(j.date)] = { satisfaction: j.satisfaction, lessons: j.lessons || '', emotions: j.emotions || [] }; });
+    const rByDate = {};
+    refl.rows.forEach(r => { rByDate[r.date] = reflRow(r); });
+
+    const shape = otsShape(cohort);
+    const upTo = Math.min(shape.currentDay || 0, cohort.total_days);
+    const rows = [];
+    for (let d = 1; d <= upTo; d++) {
+      const date = isoAddDays(cohort.start_date, d - 1);
+      const t = byDate[date];
+      rows.push({
+        dayNum: d, date,
+        reflection: rByDate[date] || null,
+        journal: jByDate[date] || null,
+        trading: t ? { trades: t.trades, pnl: Math.round(t.pnl * 100) / 100,
+          avgEmotion: t.trades ? Math.round(t.emo / t.trades * 10) / 10 : 0,
+          avgRules: t.trades ? Math.round(t.rules / t.trades * 10) / 10 : 0,
+          untagged: t.untagged } : null
+      });
+    }
+    res.json({
+      cohort: shape,
+      student: { id: u.id, username: u.username, fullName: u.first_name && u.last_name ? u.first_name + ' ' + u.last_name : u.username },
+      rows: rows.reverse()
+    });
+  } catch (err) { if (migrating(err, res)) return; console.error('Mentor OTS detail error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/mentor/ots/members', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const cohort = await otsCohort();
+    if (!cohort) return res.status(404).json({ error: 'No OTS cohort yet' });
+    const name = String(req.body.username || '').trim();
+    if (!name) return res.status(400).json({ error: 'Username required' });
+    const u = (await pool.query('SELECT id, username FROM users WHERE LOWER(username) = LOWER($1)', [name])).rows[0];
+    if (!u) return res.status(404).json({ error: 'No account with the username "' + name + '"' });
+    await pool.query('INSERT INTO ots_members (cohort_id, user_id) VALUES ($1,$2) ON CONFLICT (cohort_id, user_id) DO NOTHING', [cohort.id, u.id]);
+    res.json({ success: true, username: u.username });
+  } catch (err) { if (migrating(err, res)) return; console.error('OTS enrol error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/mentor/ots/members/:userId', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const cohort = await otsCohort();
+    if (!cohort) return res.status(404).json({ error: 'No OTS cohort yet' });
+    // Reflections are kept — removing someone from the roster is not a reason to
+    // destroy what they wrote.
+    await pool.query('DELETE FROM ots_members WHERE cohort_id = $1 AND user_id = $2', [cohort.id, req.params.userId]);
+    res.json({ success: true });
+  } catch (err) { if (migrating(err, res)) return; console.error('OTS remove error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/mentor/ots/cohort', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const start = normDateStr(req.body.startDate || '');
+    const days = parseInt(req.body.totalDays, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return res.status(400).json({ error: 'Start date must be a real date' });
+    if (!(days > 0 && days <= 366)) return res.status(400).json({ error: 'Length must be between 1 and 366 days' });
+    await pool.query("UPDATE ots_cohorts SET start_date = $1, total_days = $2 WHERE name = 'OTS 1'", [start, days]);
+    // Day numbers are derived from the start date, so shifting it renumbers
+    // existing entries rather than leaving them pointing at the wrong day.
+    const c = await otsCohort();
+    await pool.query(
+      `UPDATE ots_reflections SET day_num = (DATE(date) - DATE($1)) + 1 WHERE cohort_id = $2`, [start, c.id]);
+    res.json({ success: true, cohort: otsShape(c) });
+  } catch (err) { if (migrating(err, res)) return; console.error('OTS cohort error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const students = await pool.query(
