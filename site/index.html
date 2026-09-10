@@ -291,6 +291,12 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .ots-late-tag{font-family:var(--mono);font-size:9.5px;color:var(--yellow);border:1px solid rgba(212,175,90,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase;letter-spacing:.04em}
 .ots-kept{font-family:var(--mono);font-size:9.5px;color:var(--green);border:1px solid rgba(111,176,131,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase}
 .ots-broke{font-family:var(--mono);font-size:9.5px;color:var(--red);border:1px solid rgba(220,80,80,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase}
+.ots-kind-tag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(111,176,131,.45);border-radius:4px;padding:2px 7px;margin-bottom:9px}
+.ots-kind-tag.sm{margin-bottom:6px}
+.ots-lead{font-size:12.5px;color:var(--text-muted);line-height:1.6;margin-bottom:16px;max-width:560px}
+.ots-baseline{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:15px 18px;margin-bottom:16px}
+.ots-bl{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-top:7px}
+.ots-bl em{color:var(--text-muted);font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-right:6px}
 .ots-past{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:9px}
 .ots-past-hd{font-size:11.5px;color:var(--text-muted);font-family:var(--mono);margin-bottom:7px}
 .ots-past-l{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-top:4px}
@@ -2962,6 +2968,23 @@ function presetFor(firm,size,phase){
 // ═══ OTS ═══
 let _ots=null,_otsMentor=null,_otsView='mine',_otsStudent=null,_otsDetail=null,_otsDay=null;
 function loadOts(){return api('GET','/api/ots').then(d=>{_ots=d||null}).catch(()=>{_ots=null})}
+// Day 1 takes stock, day 90 closes the loop against it, everything between is
+// the daily two questions. Field roles stay the same across all three — where I
+// am, what I'm committing to, and a day-specific third — so one form renders all.
+const OTS_KINDS={
+  intake:{title:'Starting point',lead:n=>'Day one is for an honest baseline. You will read this again on day '+n+'.',
+    learned:{l:'Where am I right now?',p:'The truth about your trading and yourself today — not where you wish you were.'},
+    extra:{l:'What do I want to work on?',p:'The habit or weakness you know is costing you.'},
+    bringing:{l:n=>'What are my goals for these '+n+' days?',p:n=>'What has to be true on day '+n+' for this to have been worth it.'}},
+  daily:{title:null,lead:null,
+    learned:{l:'What did I learn today?',p:'The thing you know now that you didn’t this morning.'},
+    bringing:{l:'What am I bringing into tomorrow?',p:'One thing. You’ll be asked about it tomorrow.'}},
+  completion:{title:'Completion',lead:n=>n+' days. Answer this against what you wrote on day one.',
+    learned:{l:'Where am I now, compared to day 1?',p:'What actually changed — in your numbers and in you.'},
+    extra:{l:'Did I hit the goals I set?',p:'Straight answer. Which ones, which not, and why.'},
+    bringing:{l:'What am I taking forward from this?',p:'The part of these 90 days that stays with you.'}}
+};
+function otsKindOf(day,total){return day===1?'intake':day===total?'completion':'daily'}
 function otsAdd(from,n){const d=new Date(Date.UTC(+from.slice(0,4),+from.slice(5,7)-1,+from.slice(8,10))+n*864e5);return d.toISOString().slice(0,10)}
 function otsDiff(a,b){const u=x=>Date.UTC(+x.slice(0,4),+x.slice(5,7)-1,+x.slice(8,10));return Math.round((u(b)-u(a))/864e5)}
 
@@ -3008,19 +3031,38 @@ function rOts(el){
 
   // Yesterday's commitment leads, so the first thing you read is your own promise.
   if(prev&&prev.bringing){
-    h+='<div class="ots-carry fade-up"><div class="ots-carry-l">What you said you’d bring into today</div>'+
+    h+='<div class="ots-carry fade-up"><div class="ots-carry-l">'+
+       (day===2?'The goals you set on day 1':'What you said you’d bring into today')+'</div>'+
        '<div class="ots-carry-q">'+esc(prev.bringing)+'</div>'+
        '<div class="ots-carry-a"><span>Did you?</span>'+
        '<button class="ots-yn'+(cur&&cur.keptPrior===true?' yes':'')+'" onclick="otsKept(true)">Yes</button>'+
        '<button class="ots-yn'+(cur&&cur.keptPrior===false?' no':'')+'" onclick="otsKept(false)">Not really</button></div></div>';
   }
 
-  h+='<div class="card fade-up"><div class="ots-day-hd">Day '+day+' · '+fD(date)+
+  const kind=otsKindOf(day,c.totalDays),K=OTS_KINDS[kind];
+  // On the last day, day one's baseline sits above the form to answer against.
+  if(kind==='completion'){
+    const first=byDate[c.startDate];
+    if(first){
+      h+='<div class="ots-baseline fade-up"><div class="ots-carry-l">What you wrote on day 1</div>'+
+        (first.learned?'<div class="ots-bl"><em>Where you were</em> '+esc(first.learned)+'</div>':'')+
+        (first.extra?'<div class="ots-bl"><em>What you wanted to work on</em> '+esc(first.extra)+'</div>':'')+
+        (first.bringing?'<div class="ots-bl"><em>The goals you set</em> '+esc(first.bringing)+'</div>':'')+
+        '</div>';
+    }
+  }
+  const T=c.totalDays;
+  const txt=v=>typeof v==='function'?v(T):v;
+  const fld=(id,spec,val)=>'<div class="field" style="margin-bottom:14px"><label>'+txt(spec.l)+'</label>'+
+    '<textarea id="'+id+'" class="ots-ta" placeholder="'+txt(spec.p)+'">'+esc(val||'')+'</textarea></div>';
+  h+='<div class="card fade-up">'+
+     (K.title?'<div class="ots-kind-tag">'+K.title+'</div>':'')+
+     '<div class="ots-day-hd">Day '+day+' · '+fD(date)+
      (date!==c.today?' <span class="ots-late-tag">filling in a past day</span>':'')+'</div>'+
-     '<div class="field" style="margin-bottom:14px"><label>What did I learn today?</label>'+
-     '<textarea id="otsLearned" class="ots-ta" placeholder="The thing you know now that you didn’t this morning.">'+esc(cur?cur.learned:'')+'</textarea></div>'+
-     '<div class="field"><label>What am I bringing into tomorrow?</label>'+
-     '<textarea id="otsBringing" class="ots-ta" placeholder="One thing. You’ll be asked about it tomorrow.">'+esc(cur?cur.bringing:'')+'</textarea></div>'+
+     (K.lead?'<div class="ots-lead">'+txt(K.lead)+'</div>':'')+
+     fld('otsLearned',K.learned,cur?cur.learned:'')+
+     (K.extra?fld('otsExtra',K.extra,cur?cur.extra:''):'')+
+     fld('otsBringing',K.bringing,cur?cur.bringing:'')+
      '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">'+
      '<button class="btn-primary" onclick="saveOts('+day+')">'+(cur?'Update day '+day:'Save day '+day)+'</button>'+
      '<span id="otsMsg" style="font-size:12px;color:var(--text-muted)"></span></div></div>';
@@ -3031,8 +3073,10 @@ function rOts(el){
     past.forEach(r=>{h+='<div class="ots-past"><div class="ots-past-hd">Day '+r.dayNum+' · '+fD(r.date)+
       (r.late?' <span class="ots-late-tag">late</span>':'')+
       (r.keptPrior===true?' <span class="ots-kept">kept</span>':r.keptPrior===false?' <span class="ots-broke">missed</span>':'')+'</div>'+
-      (r.learned?'<div class="ots-past-l"><em>Learned</em> '+esc(r.learned)+'</div>':'')+
-      (r.bringing?'<div class="ots-past-l"><em>Brought forward</em> '+esc(r.bringing)+'</div>':'')+'</div>'});
+      (()=>{const K=OTS_KINDS[r.kind||'daily']||OTS_KINDS.daily;
+        return (r.learned?'<div class="ots-past-l"><em>'+esc(txt(K.learned.l))+'</em> '+esc(r.learned)+'</div>':'')+
+          (r.extra&&K.extra?'<div class="ots-past-l"><em>'+esc(txt(K.extra.l))+'</em> '+esc(r.extra)+'</div>':'')+
+          (r.bringing?'<div class="ots-past-l"><em>'+esc(txt(K.bringing.l))+'</em> '+esc(r.bringing)+'</div>':'')})()+'</div>'});
   }
   el.innerHTML=h;
 }
@@ -3045,10 +3089,12 @@ function saveOts(day){
   const msg=document.getElementById('otsMsg');
   const learned=document.getElementById('otsLearned').value.trim();
   const bringing=document.getElementById('otsBringing').value.trim();
-  if(!learned&&!bringing){msg.style.color='var(--red)';msg.textContent='Write something in at least one field';return}
+  const exEl=document.getElementById('otsExtra');
+  const extra=exEl?exEl.value.trim():'';
+  if(!learned&&!bringing&&!extra){msg.style.color='var(--red)';msg.textContent='Write something in at least one field';return}
   msg.style.color='var(--text-muted)';msg.textContent='Saving...';
   const date=otsAdd(_ots.cohort.startDate,day-1);
-  const body={date,learned,bringing};
+  const body={date,learned,bringing,extra};
   if(_otsKept!==null)body.keptPrior=_otsKept;
   api('POST','/api/ots/reflection',body).then(()=>loadOts()).then(()=>{_otsKept=null;ren();
     const m=document.getElementById('otsMsg');if(m){m.style.color='var(--green)';m.textContent='Saved.'}
@@ -3121,8 +3167,12 @@ function otsDetailHTML(){
       (rf&&rf.late?'<span class="ots-late-tag">late</span>':'')+
       (rf&&rf.keptPrior===true?'<span class="ots-kept">kept</span>':rf&&rf.keptPrior===false?'<span class="ots-broke">missed</span>':'')+'</div>'+
       '<div class="sbs-refl">'+(rf
-        ? (rf.learned?'<div class="sbs-l"><em>Learned</em> '+esc(rf.learned)+'</div>':'')+
-          (rf.bringing?'<div class="sbs-l"><em>Bringing</em> '+esc(rf.bringing)+'</div>':'')
+        ? (()=>{const K=OTS_KINDS[rf.kind||'daily']||OTS_KINDS.daily;
+            const T=(d.cohort&&d.cohort.totalDays)||90,tx=v=>typeof v==='function'?v(T):v;
+            return (K.title?'<div class="ots-kind-tag sm">'+K.title+'</div>':'')+
+              (rf.learned?'<div class="sbs-l"><em>'+esc(tx(K.learned.l))+'</em> '+esc(rf.learned)+'</div>':'')+
+              (rf.extra&&K.extra?'<div class="sbs-l"><em>'+esc(tx(K.extra.l))+'</em> '+esc(rf.extra)+'</div>':'')+
+              (rf.bringing?'<div class="sbs-l"><em>'+esc(tx(K.bringing.l))+'</em> '+esc(rf.bringing)+'</div>':'')})()
         : '<div class="sbs-none">No reflection</div>')+'</div>'+
       '<div class="sbs-trade">'+(t
         ? '<div class="sbs-pnl" style="color:'+(t.pnl>=0?'var(--green)':'var(--red)')+'">'+f$(t.pnl)+'</div>'+

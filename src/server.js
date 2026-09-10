@@ -476,8 +476,16 @@ function otsShape(c) {
     finished: offset + 1 > c.total_days
   };
 }
+// Day 1 takes stock, day 90 closes the loop, everything between is the daily
+// two questions. The day number decides which, so nothing has to be configured.
+function otsKind(day, total) {
+  if (day === 1) return 'intake';
+  if (day === total) return 'completion';
+  return 'daily';
+}
 const reflRow = r => ({
-  date: r.date, dayNum: r.day_num, learned: r.learned || '', bringing: r.bringing || '',
+  date: r.date, dayNum: r.day_num, kind: r.kind || 'daily',
+  learned: r.learned || '', bringing: r.bringing || '', extra: r.extra || '',
   keptPrior: r.kept_prior, writtenOn: r.written_on || '',
   late: !!(r.written_on && r.written_on > r.date)
 });
@@ -505,19 +513,23 @@ app.post('/api/ots/reflection', authMiddleware, async (req, res) => {
     if (date > etTodayStr()) return res.status(400).json({ error: 'You cannot reflect on a day that has not happened' });
     const learned = String(req.body.learned || '').slice(0, 4000);
     const bringing = String(req.body.bringing || '').slice(0, 4000);
-    if (!learned.trim() && !bringing.trim()) return res.status(400).json({ error: 'Write something in at least one field' });
+    const kind = otsKind(day, cohort.total_days);
+    // The extra field only exists on the intake and completion days.
+    const extra = kind === 'daily' ? '' : String(req.body.extra || '').slice(0, 4000);
+    if (!learned.trim() && !bringing.trim() && !extra.trim()) return res.status(400).json({ error: 'Write something in at least one field' });
     // written_on is kept so a day filled in later is visibly late rather than
     // quietly passing as done — otherwise the tracker lies about the one thing
     // it exists to measure.
     await pool.query(
-      `INSERT INTO ots_reflections (user_id, cohort_id, date, day_num, learned, bringing, kept_prior, written_on)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO ots_reflections (user_id, cohort_id, date, day_num, learned, bringing, extra, kind, kept_prior, written_on)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (user_id, date) DO UPDATE SET
          learned = EXCLUDED.learned, bringing = EXCLUDED.bringing,
+         extra = EXCLUDED.extra, kind = EXCLUDED.kind,
          kept_prior = EXCLUDED.kept_prior, updated_at = NOW()`,
-      [req.user.id, cohort.id, date, day, learned, bringing,
+      [req.user.id, cohort.id, date, day, learned, bringing, extra, kind,
        typeof req.body.keptPrior === 'boolean' ? req.body.keptPrior : null, etTodayStr()]);
-    res.json({ success: true, date, dayNum: day });
+    res.json({ success: true, date, dayNum: day, kind });
   } catch (err) { if (migrating(err, res)) return; console.error('OTS save error:', err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -634,6 +646,10 @@ app.post('/api/mentor/ots/cohort', authMiddleware, mentorOnly, async (req, res) 
     const c = await otsCohort();
     await pool.query(
       `UPDATE ots_reflections SET day_num = (DATE(date) - DATE($1)) + 1 WHERE cohort_id = $2`, [start, c.id]);
+    await pool.query(
+      `UPDATE ots_reflections SET kind = CASE WHEN day_num = 1 THEN 'intake'
+                                             WHEN day_num = $1 THEN 'completion'
+                                             ELSE 'daily' END WHERE cohort_id = $2`, [days, c.id]);
     res.json({ success: true, cohort: otsShape(c) });
   } catch (err) { if (migrating(err, res)) return; console.error('OTS cohort error:', err); res.status(500).json({ error: 'Server error' }); }
 });
