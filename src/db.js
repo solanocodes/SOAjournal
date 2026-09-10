@@ -293,6 +293,11 @@ const initDB = async () => {
         -- extra, so one shape serves all three without special-casing storage.
         kind VARCHAR(16) DEFAULT 'daily',
         extra TEXT DEFAULT '',
+        -- The questions asked that day are stored with the answers. The daily
+        -- prompts rotate, and editing the pool later must not make an old entry
+        -- look like it answered a question it was never asked.
+        prompt_a TEXT DEFAULT '',
+        prompt_b TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(user_id, date)
@@ -300,6 +305,8 @@ const initDB = async () => {
 
       ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS kind VARCHAR(16) DEFAULT 'daily';
       ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT '';
+      ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS prompt_a TEXT DEFAULT '';
+      ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS prompt_b TEXT DEFAULT '';
 
       CREATE TABLE IF NOT EXISTS payouts (
         id SERIAL PRIMARY KEY,

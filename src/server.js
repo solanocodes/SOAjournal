@@ -486,6 +486,7 @@ function otsKind(day, total) {
 const reflRow = r => ({
   date: r.date, dayNum: r.day_num, kind: r.kind || 'daily',
   learned: r.learned || '', bringing: r.bringing || '', extra: r.extra || '',
+  promptA: r.prompt_a || '', promptB: r.prompt_b || '',
   keptPrior: r.kept_prior, writtenOn: r.written_on || '',
   late: !!(r.written_on && r.written_on > r.date)
 });
@@ -521,13 +522,15 @@ app.post('/api/ots/reflection', authMiddleware, async (req, res) => {
     // quietly passing as done — otherwise the tracker lies about the one thing
     // it exists to measure.
     await pool.query(
-      `INSERT INTO ots_reflections (user_id, cohort_id, date, day_num, learned, bringing, extra, kind, kept_prior, written_on)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `INSERT INTO ots_reflections (user_id, cohort_id, date, day_num, learned, bringing, extra, kind, prompt_a, prompt_b, kept_prior, written_on)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (user_id, date) DO UPDATE SET
          learned = EXCLUDED.learned, bringing = EXCLUDED.bringing,
          extra = EXCLUDED.extra, kind = EXCLUDED.kind,
+         prompt_a = EXCLUDED.prompt_a, prompt_b = EXCLUDED.prompt_b,
          kept_prior = EXCLUDED.kept_prior, updated_at = NOW()`,
       [req.user.id, cohort.id, date, day, learned, bringing, extra, kind,
+       String(req.body.promptA || '').slice(0, 200), String(req.body.promptB || '').slice(0, 200),
        typeof req.body.keptPrior === 'boolean' ? req.body.keptPrior : null, etTodayStr()]);
     res.json({ success: true, date, dayNum: day, kind });
   } catch (err) { if (migrating(err, res)) return; console.error('OTS save error:', err); res.status(500).json({ error: 'Server error' }); }
