@@ -50,7 +50,8 @@ const OWNED_TABLES = [
   ['badges', 'user_id'], ['milestones', 'user_id'], ['risk_plans', 'user_id'],
   ['user_settings', 'user_id'], ['coach_messages', 'user_id'], ['coach_memory', 'user_id'],
   ['accounts', 'user_id'], ['payouts', 'user_id'], ['mentor_notes', 'mentor_id'],
-  ['app_state', 'key']
+  ['app_state', 'key'], ['ots_cohorts', 'start_date'], ['ots_members', 'user_id'],
+  ['ots_reflections', 'user_id']
 ];
 
 async function reserveTableNames(client) {
@@ -254,6 +255,43 @@ const initDB = async () => {
 
       -- Money taken off an account. A payout lowers the balance but never the
       -- drawdown floor, which is exactly what makes withdrawals risky.
+      -- ═══ OTS: a fixed-length cohort sprint ═══
+      -- One shared start date so "day 12" means the same day for everyone in
+      -- the cohort, which is what makes the mentor's grid comparable.
+      CREATE TABLE IF NOT EXISTS ots_cohorts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(80) NOT NULL UNIQUE,
+        start_date VARCHAR(20) NOT NULL,
+        total_days INTEGER DEFAULT 90,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS ots_members (
+        id SERIAL PRIMARY KEY,
+        cohort_id INTEGER,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        joined_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(cohort_id, user_id)
+      );
+
+      -- One reflection per person per calendar day. kept_prior records whether
+      -- they followed through on what the previous day said they would bring in,
+      -- which is the thread that makes ninety entries a chain rather than a pile.
+      CREATE TABLE IF NOT EXISTS ots_reflections (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        cohort_id INTEGER,
+        date VARCHAR(20) NOT NULL,
+        day_num INTEGER,
+        learned TEXT DEFAULT '',
+        bringing TEXT DEFAULT '',
+        kept_prior BOOLEAN,
+        written_on VARCHAR(20) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, date)
+      );
+
       CREATE TABLE IF NOT EXISTS payouts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -298,7 +336,39 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_trades_account ON trades(account_id);
       CREATE INDEX IF NOT EXISTS idx_payouts_user ON payouts(user_id);
       CREATE INDEX IF NOT EXISTS idx_payouts_account ON payouts(account_id);
+      CREATE INDEX IF NOT EXISTS idx_ots_members_user ON ots_members(user_id);
+      CREATE INDEX IF NOT EXISTS idx_ots_refl_user ON ots_reflections(user_id);
+      CREATE INDEX IF NOT EXISTS idx_ots_refl_date ON ots_reflections(date);
+
+      -- Seed the first cohort. Safe to re-run: the name is unique and the start
+      -- date is only written once, so editing it later in the app sticks.
+      INSERT INTO ots_cohorts (name, start_date, total_days)
+        VALUES ('OTS 1', '2026-09-14', 90) ON CONFLICT (name) DO NOTHING;
     `);
+    // Founding OTS 1 members, enrolled exactly once. The app_state guard means
+    // removing someone later in the Mentor Panel sticks instead of being undone
+    // on the next deploy, and anyone who is not a user yet is simply added by
+    // hand rather than silently re-seeded forever.
+    try {
+      const done = await client.query("SELECT 1 FROM app_state WHERE key = 'ots1_seeded'");
+      if (!done.rows.length) {
+        const seeded = await client.query(
+          `INSERT INTO ots_members (cohort_id, user_id)
+           SELECT c.id, u.id FROM users u CROSS JOIN ots_cohorts c
+            WHERE c.name = 'OTS 1' AND LOWER(u.username) = ANY($1)
+           ON CONFLICT (cohort_id, user_id) DO NOTHING
+           RETURNING user_id`,
+          [['seansolano', 'keshawnthedon']]);
+        // Only stamp the guard once someone was actually enrolled. A fresh
+        // database boots before any user exists, and stamping there would lock
+        // the seed out forever; once it has run, a member removed in the app
+        // stays removed.
+        if (seeded.rowCount) {
+          await client.query("INSERT INTO app_state (key, value) VALUES ('ots1_seeded', $1) ON CONFLICT (key) DO NOTHING", [String(seeded.rowCount)]);
+          console.log('OTS 1: enrolled ' + seeded.rowCount + ' founding member(s)');
+        }
+      }
+    } catch (e) { console.error('OTS seed skipped:', e.message); }
     console.log('Database initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);

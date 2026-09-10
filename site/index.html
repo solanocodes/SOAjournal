@@ -256,6 +256,73 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .stu-admin-note{font-size:11px;color:var(--text-muted)}
 .stu-pw{font-size:12px;color:var(--text-secondary);width:100%;line-height:1.6}
 .stu-pw code{font-family:var(--mono);background:var(--bg-elevated);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:13px;color:var(--accent);user-select:all}
+.ots-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.ots-t{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.ots-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
+.ots-tabs{display:flex;gap:4px;background:var(--bg-elevated);border-radius:9px;padding:3px}
+.ots-tab{background:transparent;border:0;color:var(--text-muted);font-size:12.5px;font-weight:500;padding:7px 14px;border-radius:7px;cursor:pointer}
+.ots-tab.active{background:var(--bg-card);color:var(--text-primary);font-weight:600}
+.ots-wait{text-align:center;padding:44px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)}
+.ots-wait-n{font-family:var(--mono);font-size:56px;font-weight:700;color:var(--accent);line-height:1}
+.ots-wait-l{font-size:13px;color:var(--text-secondary);margin-top:6px}
+.ots-wait-s{font-size:12px;color:var(--text-muted);margin-top:10px}
+.ots-prog{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
+.ots-prog-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin-bottom:10px}
+.ots-bar{height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;margin-bottom:14px}
+.ots-bar-f{height:100%;background:var(--accent);border-radius:3px}
+.ots-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(26px,1fr));gap:4px}
+.ots-cell{aspect-ratio:1;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);font-family:var(--mono);font-size:9.5px;border-radius:5px;cursor:pointer;padding:0;transition:all .12s}
+.ots-cell.ok{background:rgba(111,176,131,.35);border-color:rgba(111,176,131,.5);color:var(--text-primary)}
+.ots-cell.late{background:rgba(212,175,90,.28);border-color:rgba(212,175,90,.5);color:var(--text-primary)}
+.ots-cell.miss{background:rgba(220,80,80,.16);border-color:rgba(220,80,80,.34)}
+.ots-cell.now{border-color:var(--accent);color:var(--accent);font-weight:700}
+.ots-cell.sel{outline:2px solid var(--text-primary);outline-offset:1px}
+.ots-cell:hover{border-color:var(--text-muted)}
+.ots-carry{background:rgba(111,176,131,.09);border:1px solid rgba(111,176,131,.32);border-radius:var(--radius);padding:15px 18px;margin-bottom:16px}
+.ots-carry-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
+.ots-carry-q{font-size:15px;line-height:1.55;margin:7px 0 12px;font-style:italic}
+.ots-carry-a{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary)}
+.ots-yn{background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);font-size:12px;padding:5px 13px;border-radius:7px;cursor:pointer}
+.ots-yn.yes{background:var(--accent);border-color:var(--accent);color:var(--bg-base);font-weight:600}
+.ots-yn.no{background:rgba(220,80,80,.2);border-color:rgba(220,80,80,.5);color:var(--text-primary);font-weight:600}
+.ots-day-hd{font-size:14px;font-weight:700;margin-bottom:14px}
+.ots-ta{width:100%;min-height:82px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text-primary);font-family:inherit;font-size:13.5px;line-height:1.6;resize:vertical}
+.ots-ta:focus{outline:none;border-color:var(--accent)}
+.ots-late-tag{font-family:var(--mono);font-size:9.5px;color:var(--yellow);border:1px solid rgba(212,175,90,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase;letter-spacing:.04em}
+.ots-kept{font-family:var(--mono);font-size:9.5px;color:var(--green);border:1px solid rgba(111,176,131,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase}
+.ots-broke{font-family:var(--mono);font-size:9.5px;color:var(--red);border:1px solid rgba(220,80,80,.45);border-radius:4px;padding:1px 5px;margin-left:6px;text-transform:uppercase}
+.ots-past{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:9px}
+.ots-past-hd{font-size:11.5px;color:var(--text-muted);font-family:var(--mono);margin-bottom:7px}
+.ots-past-l{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-top:4px}
+.ots-past-l em{color:var(--text-muted);font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-right:6px}
+.ots-roster-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.ots-enrol{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.ots-enrol input{background:var(--bg-elevated);border:1px solid var(--border);border-radius:7px;padding:6px 11px;color:var(--text-primary);font-size:12.5px;width:150px}
+.ots-add-msg{font-size:11.5px;color:var(--text-muted)}
+.ots-roster{display:flex;flex-direction:column;gap:8px}
+.ots-row{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:border-color .15s}
+.ots-row:hover{border-color:var(--text-muted)}
+.ots-row.active{border-color:var(--accent)}
+.ots-row-hd{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.ots-row-n{font-size:13px;font-weight:600}
+.ots-row-m{font-size:11px;color:var(--text-muted);font-family:var(--mono)}
+.ots-minis{display:flex;gap:2px;flex-wrap:wrap}
+.ots-mini{width:6px;height:12px;border-radius:2px;background:var(--bg-card);flex-shrink:0}
+.ots-mini.ok{background:var(--accent)}
+.ots-mini.miss{background:rgba(220,80,80,.45)}
+.ots-sbs{display:flex;flex-direction:column;gap:2px}
+.sbs-row{display:grid;grid-template-columns:118px 1fr 1fr;gap:14px;padding:13px 0;border-top:1px solid var(--border)}
+.sbs-row.empty{opacity:.55}
+.sbs-day{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.sbs-d{font-size:12.5px;font-weight:700}
+.sbs-dt{font-size:10.5px;color:var(--text-muted);font-family:var(--mono)}
+.sbs-l{font-size:12.5px;line-height:1.6;color:var(--text-secondary);margin-bottom:5px}
+.sbs-l em,.sbs-j em{color:var(--text-muted);font-style:normal;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:6px}
+.sbs-none{font-size:11.5px;color:var(--text-muted);font-style:italic}
+.sbs-pnl{font-family:var(--mono);font-size:17px;font-weight:600}
+.sbs-meta{font-size:11.5px;color:var(--text-muted);margin-top:3px}
+.sbs-j{font-size:12px;line-height:1.55;color:var(--text-secondary);margin-top:7px}
+@media(max-width:820px){.sbs-row{grid-template-columns:1fr;gap:7px}.ots-hd{flex-direction:column}}
 .prop-card{margin-bottom:16px}
 .prop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .prop-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -1047,7 +1114,7 @@ let _allTrades=[],_accounts=[],_payouts=[],curAccount=null;
 let _cachedStudents=[],_studentsLoaded=false,_cachedStudentDetail={},_stuCalY={},_stuCalM={};
 let _dataLoaded=false;
 let _loadError='',_reloadQueued=false,_updTries=0;
-const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts','/api/payouts'];
+const LOAD_PATHS=['/api/trades','/api/journals','/api/badges','/api/milestones','/api/riskplan','/api/settings','/api/accounts','/api/payouts','/api/ots'];
 async function loadAllData(){
   _loadError='';
   // Settle each call on its own. One failing endpoint used to reject the whole
@@ -1064,6 +1131,7 @@ async function loadAllData(){
   _cachedSettings=val(5,{})||{};
   _accounts=val(6,[])||[];
   _payouts=val(7,[])||[];
+  _ots=val(8,null);
   applyAcctFilter();
   _dataLoaded=true;
   const updating=res.some(r=>r.status==='rejected'&&r.reason&&r.reason.updating);
@@ -1231,7 +1299,7 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'},{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}];if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'}].concat(_ots&&(_ots.enrolled||isMentor)?[{id:'ots',l:'OTS'}]:[]).concat([{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}]);if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
@@ -1244,7 +1312,7 @@ function viewBanners(){
   }
   return h;
 }
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,ots:rOts,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const _mdCount=tr.filter(t=>t.manualDay).reduce((a,t)=>a+((parseInt(t.tradeCount)||1)-1),0);const _pt=tr.filter(t=>!t.manualDay);const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=_pt.filter(t=>t.pnl>0),l=_pt.filter(t=>t.pnl<0);const wr=_pt.length?w.length/_pt.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length+_mdCount,sk,ar,avgEmo,em,st,cv}}
@@ -2884,6 +2952,179 @@ function presetFor(firm,size,phase){
   const days=EVAL_MIN_DAYS[firm]||0;
   return{ddType:'eod',ddAmount:base.dd,ddLock:size,profitTarget:base.target,payoutMin:0,minDays:days,retainBalance:0,
     summary:'Pass with <strong>'+f$(base.target)+'</strong> profit without losing '+f$(base.dd)+', over at least <strong>'+days+' trading day'+(days===1?'':'s')+'</strong>.'};
+}
+
+// ═══ OTS ═══
+let _ots=null,_otsMentor=null,_otsView='mine',_otsStudent=null,_otsDetail=null,_otsDay=null;
+function loadOts(){return api('GET','/api/ots').then(d=>{_ots=d||null}).catch(()=>{_ots=null})}
+function otsAdd(from,n){const d=new Date(Date.UTC(+from.slice(0,4),+from.slice(5,7)-1,+from.slice(8,10))+n*864e5);return d.toISOString().slice(0,10)}
+function otsDiff(a,b){const u=x=>Date.UTC(+x.slice(0,4),+x.slice(5,7)-1,+x.slice(8,10));return Math.round((u(b)-u(a))/864e5)}
+
+function rOts(el){
+  if(!_ots||!_ots.cohort){el.innerHTML='<div class="empty-state fade-up"><div class="empty-icon">🎯</div><h3 class="empty-title">OTS isn’t open to you yet</h3><p class="empty-text">This is a closed cohort. If you should be in it, message Sean.</p></div>';return}
+  const c=_ots.cohort;
+  let h='<div class="ots-hd"><div><h2 class="ots-t">'+esc(c.name)+'</h2>'+
+    '<div class="ots-sub">'+c.totalDays+'-day sprint · '+fD(c.startDate)+' → '+fD(c.endDate)+'</div></div>';
+  if(isMentor)h+='<div class="ots-tabs"><button class="ots-tab'+(_otsView==='mine'?' active':'')+'" onclick="otsSetView(\'mine\')">My reflections</button>'+
+    '<button class="ots-tab'+(_otsView==='cohort'?' active':'')+'" onclick="otsSetView(\'cohort\')">Cohort</button></div>';
+  h+='</div>';
+  if(isMentor&&_otsView==='cohort'){el.innerHTML=h+otsCohortHTML();if(!_otsMentor)loadOtsMentor();return}
+  if(!_ots.enrolled){el.innerHTML=h+'<div class="vbanner info">You can see this page as the mentor, but you are not enrolled in '+esc(c.name)+', so there is nothing of your own to write here.</div>'+(isMentor?otsCohortHTML():'');return}
+
+  // Before day 1 there is nothing to reflect on yet — say how long to wait.
+  if(c.currentDay===0){
+    h+='<div class="ots-wait fade-up"><div class="ots-wait-n">'+c.daysUntilStart+'</div>'+
+       '<div class="ots-wait-l">day'+(c.daysUntilStart!==1?'s':'')+' until day 1</div>'+
+       '<div class="ots-wait-s">Day 1 is '+fD(c.startDate)+'. The reflection opens that morning.</div></div>';
+    el.innerHTML=h;return;
+  }
+
+  const byDate={};(_ots.reflections||[]).forEach(r=>{byDate[r.date]=r});
+  const day=_otsDay||c.currentDay;
+  const date=otsAdd(c.startDate,day-1);
+  const cur=byDate[date]||null;
+  const prev=day>1?byDate[otsAdd(c.startDate,day-2)]:null;
+  const done=(_ots.reflections||[]).length;
+
+  h+='<div class="ots-prog fade-up"><div class="ots-prog-top"><span>Day <strong>'+c.currentDay+'</strong> of '+c.totalDays+'</span>'+
+     '<span>'+done+' reflection'+(done!==1?'s':'')+' written · '+(c.currentDay-done>0?(c.currentDay-done)+' missed':'none missed')+'</span></div>'+
+     '<div class="ots-bar"><div class="ots-bar-f" style="width:'+(c.currentDay/c.totalDays*100).toFixed(1)+'%"></div></div>';
+  h+='<div class="ots-grid">';
+  for(let d=1;d<=c.totalDays;d++){
+    const dt=otsAdd(c.startDate,d-1);
+    const st=byDate[dt]?(byDate[dt].late?'late':'ok'):(d<c.currentDay?'miss':(d===c.currentDay?'now':'soon'));
+    h+='<button class="ots-cell '+st+(d===day?' sel':'')+'" title="Day '+d+' · '+fD(dt)+'" onclick="otsGo('+d+')">'+d+'</button>';
+  }
+  h+='</div></div>';
+
+  // Yesterday's commitment leads, so the first thing you read is your own promise.
+  if(prev&&prev.bringing){
+    h+='<div class="ots-carry fade-up"><div class="ots-carry-l">What you said you’d bring into today</div>'+
+       '<div class="ots-carry-q">'+esc(prev.bringing)+'</div>'+
+       '<div class="ots-carry-a"><span>Did you?</span>'+
+       '<button class="ots-yn'+(cur&&cur.keptPrior===true?' yes':'')+'" onclick="otsKept(true)">Yes</button>'+
+       '<button class="ots-yn'+(cur&&cur.keptPrior===false?' no':'')+'" onclick="otsKept(false)">Not really</button></div></div>';
+  }
+
+  h+='<div class="card fade-up"><div class="ots-day-hd">Day '+day+' · '+fD(date)+
+     (date!==c.today?' <span class="ots-late-tag">filling in a past day</span>':'')+'</div>'+
+     '<div class="field" style="margin-bottom:14px"><label>What did I learn today?</label>'+
+     '<textarea id="otsLearned" class="ots-ta" placeholder="The thing you know now that you didn’t this morning.">'+esc(cur?cur.learned:'')+'</textarea></div>'+
+     '<div class="field"><label>What am I bringing into tomorrow?</label>'+
+     '<textarea id="otsBringing" class="ots-ta" placeholder="One thing. You’ll be asked about it tomorrow.">'+esc(cur?cur.bringing:'')+'</textarea></div>'+
+     '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">'+
+     '<button class="btn-primary" onclick="saveOts('+day+')">'+(cur?'Update day '+day:'Save day '+day)+'</button>'+
+     '<span id="otsMsg" style="font-size:12px;color:var(--text-muted)"></span></div></div>';
+
+  const past=(_ots.reflections||[]).slice().reverse();
+  if(past.length){
+    h+='<div style="font-size:13px;font-weight:600;margin:20px 0 10px">Everything so far</div>';
+    past.forEach(r=>{h+='<div class="ots-past"><div class="ots-past-hd">Day '+r.dayNum+' · '+fD(r.date)+
+      (r.late?' <span class="ots-late-tag">late</span>':'')+
+      (r.keptPrior===true?' <span class="ots-kept">kept</span>':r.keptPrior===false?' <span class="ots-broke">missed</span>':'')+'</div>'+
+      (r.learned?'<div class="ots-past-l"><em>Learned</em> '+esc(r.learned)+'</div>':'')+
+      (r.bringing?'<div class="ots-past-l"><em>Brought forward</em> '+esc(r.bringing)+'</div>':'')+'</div>'});
+  }
+  el.innerHTML=h;
+}
+let _otsKept=null;
+function otsKept(v){_otsKept=v;document.querySelectorAll('.ots-yn').forEach(b=>b.classList.remove('yes','no'));
+  const bs=document.querySelectorAll('.ots-yn');if(bs.length===2){bs[v?0:1].classList.add(v?'yes':'no')}}
+function otsGo(d){_otsDay=d;_otsKept=null;ren()}
+function otsSetView(v){_otsView=v;_otsStudent=null;_otsDetail=null;ren()}
+function saveOts(day){
+  const msg=document.getElementById('otsMsg');
+  const learned=document.getElementById('otsLearned').value.trim();
+  const bringing=document.getElementById('otsBringing').value.trim();
+  if(!learned&&!bringing){msg.style.color='var(--red)';msg.textContent='Write something in at least one field';return}
+  msg.style.color='var(--text-muted)';msg.textContent='Saving...';
+  const date=otsAdd(_ots.cohort.startDate,day-1);
+  const body={date,learned,bringing};
+  if(_otsKept!==null)body.keptPrior=_otsKept;
+  api('POST','/api/ots/reflection',body).then(()=>loadOts()).then(()=>{_otsKept=null;ren();
+    const m=document.getElementById('otsMsg');if(m){m.style.color='var(--green)';m.textContent='Saved.'}
+  }).catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
+
+// ─── OTS: MENTOR ───
+function loadOtsMentor(){api('GET','/api/mentor/ots').then(d=>{_otsMentor=d||null;if(curView==='ots')ren()}).catch(e=>console.error(e))}
+function loadOtsStudent(id){_otsDetail=null;api('GET','/api/mentor/ots/'+id).then(d=>{_otsDetail=d;if(curView==='ots')ren()}).catch(e=>alert(e.message))}
+function otsPick(id){_otsStudent=_otsStudent===id?null:id;if(_otsStudent)loadOtsStudent(id);else{_otsDetail=null;ren()}}
+
+function otsCohortHTML(){
+  if(!_otsMentor)return'<div class="empty-state fade-up"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading cohort…</h3></div>';
+  const c=_otsMentor.cohort,ms=_otsMentor.members||[];
+  let h='<div class="card" style="margin-bottom:16px"><div class="ots-roster-hd">'+
+    '<div><div style="font-size:14px;font-weight:700">Roster · '+ms.length+' member'+(ms.length!==1?'s':'')+'</div>'+
+    '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">'+(c.currentDay===0
+      ? 'Starts in '+c.daysUntilStart+' day'+(c.daysUntilStart!==1?'s':'')
+      : 'Day '+c.currentDay+' of '+c.totalDays)+'</div></div>'+
+    '<div class="ots-enrol"><input id="otsAddUser" placeholder="username" autocomplete="off">'+
+    '<button class="btn-sm" onclick="otsEnrol()">Add member</button><span id="otsAddMsg" class="ots-add-msg"></span></div></div>';
+  if(!ms.length){h+='<div style="font-size:12.5px;color:var(--text-muted)">Nobody enrolled yet. Add them by username above.</div></div>';return h}
+  // Compliance first: who is keeping up, at a glance, before any detail.
+  h+='<div class="ots-roster">';
+  ms.forEach(m=>{
+    const set=new Set(m.days||[]);
+    const upTo=c.currentDay||0;
+    const missed=Math.max(0,upTo-m.done);
+    let cells='';
+    for(let d=1;d<=c.totalDays;d++){
+      const st=set.has(d)?'ok':(d<=upTo?'miss':'soon');
+      cells+='<span class="ots-mini '+st+'" title="Day '+d+'"></span>';
+    }
+    h+='<div class="ots-row'+(_otsStudent===m.id?' active':'')+'" onclick="otsPick('+m.id+')">'+
+      '<div class="ots-row-hd"><span class="ots-row-n">'+esc(m.fullName)+'</span>'+
+      '<span class="ots-row-m">'+m.done+'/'+upTo+' written'+(m.late?' · '+m.late+' late':'')+
+      (missed?' <strong style="color:var(--yellow)">'+missed+' missed</strong>':'')+'</span></div>'+
+      '<div class="ots-minis">'+cells+'</div></div>';
+  });
+  h+='</div></div>';
+  if(_otsStudent){
+    h+= _otsDetail?otsDetailHTML():'<div class="empty-state fade-in"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading…</h3></div>';
+  }
+  return h;
+}
+
+// Their words beside what they actually did that day. Same row, same date —
+// that alignment is the whole point of the page.
+function otsDetailHTML(){
+  const d=_otsDetail;
+  let h='<div class="card"><div style="font-size:14px;font-weight:700;margin-bottom:4px">'+esc(d.student.fullName)+'</div>'+
+    '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px">@'+esc(d.student.username)+' · reflections beside that day’s trading</div>';
+  if(!d.rows.length){h+='<div style="font-size:12.5px;color:var(--text-muted)">The sprint has not started yet.</div></div>';return h}
+  h+='<div class="ots-sbs">';
+  d.rows.forEach(r=>{
+    const t=r.trading,rf=r.reflection;
+    h+='<div class="sbs-row'+(rf?'':' empty')+'">'+
+      '<div class="sbs-day"><span class="sbs-d">Day '+r.dayNum+'</span><span class="sbs-dt">'+fD(r.date)+'</span>'+
+      (rf&&rf.late?'<span class="ots-late-tag">late</span>':'')+
+      (rf&&rf.keptPrior===true?'<span class="ots-kept">kept</span>':rf&&rf.keptPrior===false?'<span class="ots-broke">missed</span>':'')+'</div>'+
+      '<div class="sbs-refl">'+(rf
+        ? (rf.learned?'<div class="sbs-l"><em>Learned</em> '+esc(rf.learned)+'</div>':'')+
+          (rf.bringing?'<div class="sbs-l"><em>Bringing</em> '+esc(rf.bringing)+'</div>':'')
+        : '<div class="sbs-none">No reflection</div>')+'</div>'+
+      '<div class="sbs-trade">'+(t
+        ? '<div class="sbs-pnl" style="color:'+(t.pnl>=0?'var(--green)':'var(--red)')+'">'+f$(t.pnl)+'</div>'+
+          '<div class="sbs-meta">'+t.trades+' trade'+(t.trades!==1?'s':'')+' · emotion '+t.avgEmotion+'/10 · '+t.avgRules+'/8 rules'+
+          (t.untagged?' · <span style="color:var(--yellow)">'+t.untagged+' untagged</span>':'')+'</div>'
+        : '<div class="sbs-none">No trades</div>')+
+        (r.journal&&r.journal.lessons?'<div class="sbs-j"><em>Journal</em> '+esc(r.journal.lessons)+'</div>':'')+
+      '</div></div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+function otsEnrol(){
+  const el=document.getElementById('otsAddUser'),msg=document.getElementById('otsAddMsg');
+  const u=(el.value||'').trim();
+  if(!u){msg.style.color='var(--red)';msg.textContent='Enter a username';return}
+  msg.style.color='var(--text-muted)';msg.textContent='Adding...';
+  api('POST','/api/mentor/ots/members',{username:u}).then(d=>{
+    el.value='';msg.style.color='var(--green)';msg.textContent=d.username+' added.';
+    loadOtsMentor();
+  }).catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
 }
 
 // ─── PROP FIRMS ───
