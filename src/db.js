@@ -350,7 +350,11 @@ const initDB = async () => {
     // on the next deploy, and anyone who is not a user yet is simply added by
     // hand rather than silently re-seeded forever.
     try {
-      const done = await client.query("SELECT 1 FROM app_state WHERE key = 'ots1_seeded'");
+      // Versioned guard: the first pass ran before ktdtech's username was known,
+      // so it needs to run once more against the corrected roster. Bumping the
+      // key is how a member is added at deploy time without re-adding anyone the
+      // mentor has since removed.
+      const done = await client.query("SELECT 1 FROM app_state WHERE key = 'ots1_seeded_v2'");
       if (!done.rows.length) {
         const seeded = await client.query(
           `INSERT INTO ots_members (cohort_id, user_id)
@@ -358,17 +362,29 @@ const initDB = async () => {
             WHERE c.name = 'OTS 1' AND LOWER(u.username) = ANY($1)
            ON CONFLICT (cohort_id, user_id) DO NOTHING
            RETURNING user_id`,
-          [['seansolano', 'keshawnthedon']]);
+          [['seansolano', 'ktdtech']]);
         // Only stamp the guard once someone was actually enrolled. A fresh
         // database boots before any user exists, and stamping there would lock
         // the seed out forever; once it has run, a member removed in the app
         // stays removed.
         if (seeded.rowCount) {
-          await client.query("INSERT INTO app_state (key, value) VALUES ('ots1_seeded', $1) ON CONFLICT (key) DO NOTHING", [String(seeded.rowCount)]);
-          console.log('OTS 1: enrolled ' + seeded.rowCount + ' founding member(s)');
+          await client.query("INSERT INTO app_state (key, value) VALUES ('ots1_seeded_v2', $1) ON CONFLICT (key) DO NOTHING", [String(seeded.rowCount)]);
+          console.log('OTS 1: enrolled ' + seeded.rowCount + ' member(s)');
         }
       }
     } catch (e) { console.error('OTS seed skipped:', e.message); }
+    try {
+      const moved = await client.query(
+        `UPDATE ots_cohorts SET start_date = to_char(now() AT TIME ZONE 'America/New_York', 'YYYY-MM-DD')
+          WHERE name = 'OTS 1' AND start_date = '2026-09-14'
+            AND NOT EXISTS (SELECT 1 FROM ots_reflections r WHERE r.cohort_id = ots_cohorts.id)
+            AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'ots1_started')
+          RETURNING start_date`);
+      if (moved.rowCount) {
+        await client.query("INSERT INTO app_state (key, value) VALUES ('ots1_started', $1) ON CONFLICT (key) DO NOTHING", [moved.rows[0].start_date]);
+        console.log('OTS 1: start date brought forward to ' + moved.rows[0].start_date + ' so the page is live; set it back from the roster when the real cohort begins');
+      }
+    } catch (e) { console.error('OTS start-date move skipped:', e.message); }
     console.log('Database initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);
