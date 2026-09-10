@@ -252,6 +252,10 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .pc-l{font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
 .pc-v{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em;margin:3px 0 5px}
 .pc-s{font-size:11.5px;color:var(--text-secondary);line-height:1.5}
+.stu-admin{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.stu-admin-note{font-size:11px;color:var(--text-muted)}
+.stu-pw{font-size:12px;color:var(--text-secondary);width:100%;line-height:1.6}
+.stu-pw code{font-family:var(--mono);background:var(--bg-elevated);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:13px;color:var(--accent);user-select:all}
 .prop-card{margin-bottom:16px}
 .prop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .prop-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -1624,6 +1628,13 @@ function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div c
       const det=_cachedStudentDetail[s.username];
       h+=`<div class="fade-in" style="margin-bottom:16px"><div class="stats-grid" style="margin:12px 0"><div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-value" style="color:${s.totalPnl>=0?'var(--green)':'var(--red)'};font-size:20px">${f$(s.totalPnl)}</div></div><div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" style="font-size:20px">${s.winRate.toFixed(1)}%</div></div><div class="stat-card"><div class="stat-label">Avg Emotion</div><div class="stat-value" style="font-size:20px">${s.avgEmotion.toFixed(1)}/10</div></div><div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-value" style="font-size:20px">${s.tradeCount}</div></div></div>`;
       if(det){h+=buildStudentCal(det.trades,s.username)}else{h+=`<div style="text-align:center;padding:20px;font-family:var(--mono);font-size:12px;color:var(--text-muted)">Loading calendar...</div>`}
+      h+=`<div class="stu-admin" onclick="event.stopPropagation()">
+        <button class="btn-sm" onclick="resetStudentPw(${s.id},'${esc(s.fullName).replace(/'/g,'')}')">Reset password</button>
+        <span class="stu-admin-note">${s.canSelfRecover
+          ? 'Can also reset it themselves with their security question.'
+          : 'No security question on this account &mdash; a reset here is the only way back in.'}</span>
+        <span class="stu-pw" id="stupw-${s.id}"></span>
+      </div>`;
       h+=`</div>`;
     }
   });
@@ -1718,6 +1729,15 @@ function loadMentorInsights(){
   if(_mentorInsights){render(_mentorInsights);return}
   el.innerHTML='<div class="mi-clear">Loading Delta\'s flags…</div>';
   api('GET','/api/mentor/insights').then(d=>{_mentorInsights=d||[];render(_mentorInsights)}).catch(()=>{el.innerHTML=''});
+}
+function resetStudentPw(id,name){
+  if(!confirm('Reset the password for '+name+"?\\n\\nTheir current password stops working immediately and you will need to send them the temporary one."))return;
+  const out=document.getElementById('stupw-'+id);
+  if(out)out.textContent='Resetting...';
+  api('POST','/api/mentor/reset-password/'+id,{}).then(d=>{
+    if(out)out.innerHTML='Temporary password for <strong>'+esc(d.username)+'</strong>: <code>'+esc(d.tempPassword)+
+      '</code> &mdash; send it to them now, it is not shown again. They can change it in Settings.';
+  }).catch(e=>{if(out)out.textContent=e.message});
 }
 function loadStuDetail(id,username){if(_cachedStudentDetail[username])return;api('GET','/api/mentor/student/'+id).then(data=>{_cachedStudentDetail[username]=data;const now=new Date();_stuCalY[username]=now.getFullYear();_stuCalM[username]=now.getMonth();ren()}).catch(err=>console.error(err))}
 
@@ -2807,6 +2827,18 @@ function rRisk(el){
 }
 
 // ═══ SETTINGS ═══
+function changeMyPassword(){
+  const cur=document.getElementById('pwCur').value,nw=document.getElementById('pwNew').value,
+        con=document.getElementById('pwCon').value,msg=document.getElementById('pwMsg');
+  if(!cur||!nw){msg.style.color='var(--red)';msg.textContent='Fill in your current and new password';return}
+  if(nw.length<4){msg.style.color='var(--red)';msg.textContent='New password must be at least 4 characters';return}
+  if(nw!==con){msg.style.color='var(--red)';msg.textContent='New passwords do not match';return}
+  msg.style.color='var(--text-muted)';msg.textContent='Saving...';
+  api('POST','/api/auth/change-password',{currentPassword:cur,newPassword:nw}).then(()=>{
+    ['pwCur','pwNew','pwCon'].forEach(id=>document.getElementById(id).value='');
+    msg.style.color='var(--green)';msg.textContent='Password changed.';
+  }).catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
 function loadCoachMemory(){
   const el=document.getElementById('coachMemList');if(!el)return;
   api('GET','/api/coach/memory').then(rows=>{
@@ -3123,6 +3155,20 @@ function rSettings(el){
   const msCount=Object.keys(getMilestones()).length;
   el.innerHTML=`<div style="max-width:760px;margin:0 auto" class="fade-up">
     <h2 style="font-size:20px;font-weight:800;margin-bottom:24px">Settings</h2>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Password</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Change it any time &mdash; do this straight away if Sean reset it for you.</div>
+      <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        <div class="field"><label>Current password</label><input type="password" id="pwCur" autocomplete="current-password"></div>
+        <div class="field"><label>New password</label><input type="password" id="pwNew" autocomplete="new-password"></div>
+        <div class="field"><label>Confirm new password</label><input type="password" id="pwCon" autocomplete="new-password"></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="changeMyPassword()">Change password</button>
+        <span id="pwMsg" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+    </div>
 
     <div class="card" style="margin-bottom:16px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Prop Firm Accounts</div>
