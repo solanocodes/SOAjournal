@@ -2971,6 +2971,51 @@ function loadOts(){return api('GET','/api/ots').then(d=>{_ots=d||null}).catch(()
 // Day 1 takes stock, day 90 closes the loop against it, everything between is
 // the daily two questions. Field roles stay the same across all three — where I
 // am, what I'm committing to, and a day-specific third — so one form renders all.
+// ── Daily prompt rotation ──
+// Sixteen looking-back questions, one per day, cycling. Keyed off the day number
+// so it is deterministic and cohort-wide: everyone in OTS 1 gets the same
+// question on the same day, which means it can be talked about as a group, and
+// re-opening day 12 always shows day 12's question.
+// Swap any of these for your own wording — the text asked is stored with each
+// answer, so changing the pool never rewrites what someone already answered.
+const OTS_DAILY_A=[
+  {l:'What did I learn today?',p:'The thing you know now that you didn’t this morning.'},
+  {l:'Where did I follow my plan, and where did I drift?',p:'Be specific about the drift.'},
+  {l:'What did the market show me that I didn’t expect?',p:'And what you did about it.'},
+  {l:'What was the hardest moment today, and what did I do with it?',p:'The moment you nearly broke a rule.'},
+  {l:'Which trade would I take again exactly as it was?',p:'Process, not outcome — a loss can qualify.'},
+  {l:'What did I avoid doing today that I would have done a month ago?',p:'Proof you’ve changed, however small.'},
+  {l:'Where was I patient, and where was I early?',p:'Entries you waited for versus entries you forced.'},
+  {l:'What did today cost me that wasn’t money?',p:'Time, sleep, mood, someone else’s patience.'},
+  {l:'If I had stopped after my first trade, would the day have been better or worse?',p:'Answer honestly, then look at the number.'},
+  {l:'What was I feeling right before my worst decision?',p:'Name the feeling, not the trade.'},
+  {l:'What went right that I’m not giving myself credit for?',p:'You are allowed to write this one down.'},
+  {l:'What did I do today purely out of boredom?',p:'Including the trades you’d rather not mention.'},
+  {l:'Which rule was hardest to hold today, and did I hold it?',p:'Name the rule.'},
+  {l:'What would I tell someone else who traded my day?',p:'Say it to yourself in those words.'},
+  {l:'How did I show up physically, and did it show in my trading?',p:'Sleep, food, screen time, everything before the open.'},
+  {l:'What am I still pretending isn’t a problem?',p:'The one you keep not writing down.'}
+];
+// The second question always has to be a forward commitment — tomorrow's
+// carry-forward and the kept / not-really check both hang off it — so only the
+// wording rotates, weekly, and the role never changes.
+const OTS_DAILY_B=[
+  {l:'What am I bringing into tomorrow?',p:'One thing. You’ll be asked about it tomorrow.'},
+  {l:'What is the one thing I’m committing to tomorrow?',p:'Small enough that you can’t talk yourself out of it.'},
+  {l:'What will I do differently at the open?',p:'One change, decided now rather than at 9:30.'},
+  {l:'What am I holding myself to tomorrow?',p:'You’ll see this again in the morning.'},
+  {l:'If tomorrow goes wrong, what will I refuse to do?',p:'Decide it while you’re calm.'}
+];
+function otsDailyPrompts(day){
+  const i=Math.max(0,day-2),n=OTS_DAILY_A.length;
+  // Each pass through the pool starts at a different point, so the second time
+  // round is not the first time round again — day 18 does not repeat day 2.
+  // The offset is co-prime with the pool size, so every question still comes up
+  // exactly once per cycle.
+  const idx=(i+5*Math.floor(i/n))%n;
+  return{learned:OTS_DAILY_A[idx],
+         bringing:OTS_DAILY_B[Math.floor(i/7)%OTS_DAILY_B.length]};
+}
 const OTS_KINDS={
   intake:{title:'Starting point',lead:n=>'Day one is for an honest baseline. You will read this again on day '+n+'.',
     learned:{l:'Where am I right now?',p:'The truth about your trading and yourself today — not where you wish you were.'},
@@ -2984,6 +3029,15 @@ const OTS_KINDS={
     extra:{l:'Did I hit the goals I set?',p:'Straight answer. Which ones, which not, and why.'},
     bringing:{l:'What am I taking forward from this?',p:'The part of these 90 days that stays with you.'}}
 };
+// What to label a stored answer with: the question it was actually asked,
+// falling back to the rotation for rows written before prompts were recorded.
+function otsPromptsFor(r,total){
+  const kind=r.kind||'daily';
+  const base=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(r.dayNum||2)):OTS_KINDS[kind];
+  const tx=v=>typeof v==='function'?v(total||90):v;
+  return{a:r.promptA||tx(base.learned.l),b:r.promptB||tx(base.bringing.l),
+         c:base.extra?tx(base.extra.l):''};
+}
 function otsKindOf(day,total){return day===1?'intake':day===total?'completion':'daily'}
 function otsAdd(from,n){const d=new Date(Date.UTC(+from.slice(0,4),+from.slice(5,7)-1,+from.slice(8,10))+n*864e5);return d.toISOString().slice(0,10)}
 function otsDiff(a,b){const u=x=>Date.UTC(+x.slice(0,4),+x.slice(5,7)-1,+x.slice(8,10));return Math.round((u(b)-u(a))/864e5)}
@@ -3039,7 +3093,8 @@ function rOts(el){
        '<button class="ots-yn'+(cur&&cur.keptPrior===false?' no':'')+'" onclick="otsKept(false)">Not really</button></div></div>';
   }
 
-  const kind=otsKindOf(day,c.totalDays),K=OTS_KINDS[kind];
+  const kind=otsKindOf(day,c.totalDays);
+  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day)):OTS_KINDS[kind];
   // On the last day, day one's baseline sits above the form to answer against.
   if(kind==='completion'){
     const first=byDate[c.startDate];
@@ -3073,10 +3128,10 @@ function rOts(el){
     past.forEach(r=>{h+='<div class="ots-past"><div class="ots-past-hd">Day '+r.dayNum+' · '+fD(r.date)+
       (r.late?' <span class="ots-late-tag">late</span>':'')+
       (r.keptPrior===true?' <span class="ots-kept">kept</span>':r.keptPrior===false?' <span class="ots-broke">missed</span>':'')+'</div>'+
-      (()=>{const K=OTS_KINDS[r.kind||'daily']||OTS_KINDS.daily;
-        return (r.learned?'<div class="ots-past-l"><em>'+esc(txt(K.learned.l))+'</em> '+esc(r.learned)+'</div>':'')+
-          (r.extra&&K.extra?'<div class="ots-past-l"><em>'+esc(txt(K.extra.l))+'</em> '+esc(r.extra)+'</div>':'')+
-          (r.bringing?'<div class="ots-past-l"><em>'+esc(txt(K.bringing.l))+'</em> '+esc(r.bringing)+'</div>':'')})()+'</div>'});
+      (()=>{const K=otsPromptsFor(r,c.totalDays);
+        return (r.learned?'<div class="ots-past-l"><em>'+esc(K.a)+'</em> '+esc(r.learned)+'</div>':'')+
+          (r.extra&&K.c?'<div class="ots-past-l"><em>'+esc(K.c)+'</em> '+esc(r.extra)+'</div>':'')+
+          (r.bringing?'<div class="ots-past-l"><em>'+esc(K.b)+'</em> '+esc(r.bringing)+'</div>':'')})()+'</div>'});
   }
   el.innerHTML=h;
 }
@@ -3094,7 +3149,10 @@ function saveOts(day){
   if(!learned&&!bringing&&!extra){msg.style.color='var(--red)';msg.textContent='Write something in at least one field';return}
   msg.style.color='var(--text-muted)';msg.textContent='Saving...';
   const date=otsAdd(_ots.cohort.startDate,day-1);
-  const body={date,learned,bringing,extra};
+  const kind=otsKindOf(day,_ots.cohort.totalDays);
+  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day)):OTS_KINDS[kind];
+  const T=_ots.cohort.totalDays,tx=v=>typeof v==='function'?v(T):v;
+  const body={date,learned,bringing,extra,promptA:tx(K.learned.l),promptB:tx(K.bringing.l)};
   if(_otsKept!==null)body.keptPrior=_otsKept;
   api('POST','/api/ots/reflection',body).then(()=>loadOts()).then(()=>{_otsKept=null;ren();
     const m=document.getElementById('otsMsg');if(m){m.style.color='var(--green)';m.textContent='Saved.'}
@@ -3167,12 +3225,12 @@ function otsDetailHTML(){
       (rf&&rf.late?'<span class="ots-late-tag">late</span>':'')+
       (rf&&rf.keptPrior===true?'<span class="ots-kept">kept</span>':rf&&rf.keptPrior===false?'<span class="ots-broke">missed</span>':'')+'</div>'+
       '<div class="sbs-refl">'+(rf
-        ? (()=>{const K=OTS_KINDS[rf.kind||'daily']||OTS_KINDS.daily;
-            const T=(d.cohort&&d.cohort.totalDays)||90,tx=v=>typeof v==='function'?v(T):v;
-            return (K.title?'<div class="ots-kind-tag sm">'+K.title+'</div>':'')+
-              (rf.learned?'<div class="sbs-l"><em>'+esc(tx(K.learned.l))+'</em> '+esc(rf.learned)+'</div>':'')+
-              (rf.extra&&K.extra?'<div class="sbs-l"><em>'+esc(tx(K.extra.l))+'</em> '+esc(rf.extra)+'</div>':'')+
-              (rf.bringing?'<div class="sbs-l"><em>'+esc(tx(K.bringing.l))+'</em> '+esc(rf.bringing)+'</div>':'')})()
+        ? (()=>{const T=(d.cohort&&d.cohort.totalDays)||90;
+            const K=otsPromptsFor(rf,T),tag=OTS_KINDS[rf.kind||'daily'];
+            return (tag&&tag.title?'<div class="ots-kind-tag sm">'+tag.title+'</div>':'')+
+              (rf.learned?'<div class="sbs-l"><em>'+esc(K.a)+'</em> '+esc(rf.learned)+'</div>':'')+
+              (rf.extra&&K.c?'<div class="sbs-l"><em>'+esc(K.c)+'</em> '+esc(rf.extra)+'</div>':'')+
+              (rf.bringing?'<div class="sbs-l"><em>'+esc(K.b)+'</em> '+esc(rf.bringing)+'</div>':'')})()
         : '<div class="sbs-none">No reflection</div>')+'</div>'+
       '<div class="sbs-trade">'+(t
         ? '<div class="sbs-pnl" style="color:'+(t.pnl>=0?'var(--green)':'var(--red)')+'">'+f$(t.pnl)+'</div>'+
