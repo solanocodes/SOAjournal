@@ -299,6 +299,11 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .ots-enrol{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .ots-enrol input{background:var(--bg-elevated);border:1px solid var(--border);border-radius:7px;padding:6px 11px;color:var(--text-primary);font-size:12.5px;width:150px}
 .ots-add-msg{font-size:11.5px;color:var(--text-muted)}
+.ots-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 0 14px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.ots-dates-l{font-size:11.5px;color:var(--text-muted)}
+.ots-dates input{background:var(--bg-elevated);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text-primary);font-size:12.5px}
+.ots-dates input[type=number]{width:66px;font-family:var(--mono)}
+.ots-dates-note{font-size:11px;color:var(--text-muted);width:100%}
 .ots-roster{display:flex;flex-direction:column;gap:8px}
 .ots-row{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:border-color .15s}
 .ots-row:hover{border-color:var(--text-muted)}
@@ -2985,9 +2990,13 @@ function rOts(el){
   const cur=byDate[date]||null;
   const prev=day>1?byDate[otsAdd(c.startDate,day-2)]:null;
   const done=(_ots.reflections||[]).length;
+  // Only days that have already passed can be missed — today is still open.
+  let missed=0;
+  for(let d=1;d<c.currentDay;d++)if(!byDate[otsAdd(c.startDate,d-1)])missed++;
 
   h+='<div class="ots-prog fade-up"><div class="ots-prog-top"><span>Day <strong>'+c.currentDay+'</strong> of '+c.totalDays+'</span>'+
-     '<span>'+done+' reflection'+(done!==1?'s':'')+' written · '+(c.currentDay-done>0?(c.currentDay-done)+' missed':'none missed')+'</span></div>'+
+     '<span>'+done+' reflection'+(done!==1?'s':'')+' written'+(missed?' · '+missed+' missed':'')+
+     (byDate[otsAdd(c.startDate,c.currentDay-1)]?'':' · today still open')+'</span></div>'+
      '<div class="ots-bar"><div class="ots-bar-f" style="width:'+(c.currentDay/c.totalDays*100).toFixed(1)+'%"></div></div>';
   h+='<div class="ots-grid">';
   for(let d=1;d<=c.totalDays;d++){
@@ -3060,14 +3069,24 @@ function otsCohortHTML(){
       ? 'Starts in '+c.daysUntilStart+' day'+(c.daysUntilStart!==1?'s':'')
       : 'Day '+c.currentDay+' of '+c.totalDays)+'</div></div>'+
     '<div class="ots-enrol"><input id="otsAddUser" placeholder="username" autocomplete="off">'+
-    '<button class="btn-sm" onclick="otsEnrol()">Add member</button><span id="otsAddMsg" class="ots-add-msg"></span></div></div>';
+    '<button class="btn-sm" onclick="otsEnrol()">Add member</button><span id="otsAddMsg" class="ots-add-msg"></span></div></div>'+
+    '<div class="ots-dates"><span class="ots-dates-l">Day 1</span>'+
+    '<input type="date" id="otsStart" value="'+esc(c.startDate)+'">'+
+    '<span class="ots-dates-l">for</span>'+
+    '<input type="number" id="otsDays" value="'+c.totalDays+'" min="1" max="366">'+
+    '<span class="ots-dates-l">days</span>'+
+    '<button class="btn-sm" onclick="otsSaveDates()">Save dates</button>'+
+    '<span id="otsDateMsg" class="ots-add-msg"></span>'+
+    '<span class="ots-dates-note">Changing day 1 renumbers every reflection already written.</span></div>';
   if(!ms.length){h+='<div style="font-size:12.5px;color:var(--text-muted)">Nobody enrolled yet. Add them by username above.</div></div>';return h}
   // Compliance first: who is keeping up, at a glance, before any detail.
   h+='<div class="ots-roster">';
   ms.forEach(m=>{
     const set=new Set(m.days||[]);
     const upTo=c.currentDay||0;
-    const missed=Math.max(0,upTo-m.done);
+    let missed=0;
+    for(let d=1;d<upTo;d++)if(!set.has(d))missed++;   // today is not missed yet
+    const todayDone=upTo>0&&set.has(upTo);
     let cells='';
     for(let d=1;d<=c.totalDays;d++){
       const st=set.has(d)?'ok':(d<=upTo?'miss':'soon');
@@ -3076,7 +3095,8 @@ function otsCohortHTML(){
     h+='<div class="ots-row'+(_otsStudent===m.id?' active':'')+'" onclick="otsPick('+m.id+')">'+
       '<div class="ots-row-hd"><span class="ots-row-n">'+esc(m.fullName)+'</span>'+
       '<span class="ots-row-m">'+m.done+'/'+upTo+' written'+(m.late?' · '+m.late+' late':'')+
-      (missed?' <strong style="color:var(--yellow)">'+missed+' missed</strong>':'')+'</span></div>'+
+      (missed?' · <strong style="color:var(--yellow)">'+missed+' missed</strong>':'')+
+      (upTo>0&&!todayDone?' · <span style="color:var(--text-muted)">today open</span>':'')+'</span></div>'+
       '<div class="ots-minis">'+cells+'</div></div>';
   });
   h+='</div></div>';
@@ -3116,6 +3136,19 @@ function otsDetailHTML(){
   return h;
 }
 
+function otsSaveDates(){
+  const start=document.getElementById('otsStart').value,days=document.getElementById('otsDays').value;
+  const msg=document.getElementById('otsDateMsg');
+  if(!start){msg.style.color='var(--red)';msg.textContent='Pick a start date';return}
+  const n=(_otsMentor&&_otsMentor.members||[]).reduce((a,m)=>a+m.done,0);
+  if(n&&!confirm('Moving day 1 renumbers '+n+' reflection'+(n!==1?'s':'')+' already written. Continue?'))return;
+  msg.style.color='var(--text-muted)';msg.textContent='Saving...';
+  api('POST','/api/mentor/ots/cohort',{startDate:start,totalDays:parseInt(days,10)})
+    .then(()=>Promise.all([loadOts(),api('GET','/api/mentor/ots')]))
+    .then(([,m])=>{_otsMentor=m;ren();
+      const x=document.getElementById('otsDateMsg');if(x){x.style.color='var(--green)';x.textContent='Saved.'}})
+    .catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
 function otsEnrol(){
   const el=document.getElementById('otsAddUser'),msg=document.getElementById('otsAddMsg');
   const u=(el.value||'').trim();
