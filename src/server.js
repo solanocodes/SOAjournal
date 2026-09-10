@@ -403,6 +403,44 @@ app.post('/api/settings', authMiddleware, async (req, res) => {
 // MENTOR DASHBOARD ROUTES
 // ═══════════════════════════════════
 
+// Let a signed-in trader change their own password. Without this, anyone the
+// mentor resets is stuck on a temporary one forever.
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'New password must be at least 4 characters' });
+    const u = (await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id])).rows[0];
+    if (!u) return res.status(404).json({ error: 'Account not found' });
+    if (!await bcrypt.compare(currentPassword || '', u.password_hash)) return res.status(401).json({ error: 'Current password is incorrect' });
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await bcrypt.hash(newPassword, 10), req.user.id]);
+    res.json({ success: true });
+  } catch (err) { console.error('Change password error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Mentor reset. A student who never set a security question — every account made
+// before that field existed — has no way back in on their own, so the mentor needs
+// one. Issues a random temporary password, shown once and never stored in the
+// clear, which the student then changes in Settings.
+const TEMP_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'; // no 0/O/1/I/l
+function tempPassword(len = 10) {
+  const bytes = crypto.randomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i++) out += TEMP_ALPHABET[bytes[i] % TEMP_ALPHABET.length];
+  return out;
+}
+
+app.post('/api/mentor/reset-password/:id', authMiddleware, mentorOnly, async (req, res) => {
+  try {
+    const target = (await pool.query('SELECT id, username, first_name, last_name, is_mentor FROM users WHERE id = $1', [req.params.id])).rows[0];
+    if (!target) return res.status(404).json({ error: 'Student not found' });
+    if (target.is_mentor) return res.status(403).json({ error: 'Mentor accounts cannot be reset from here' });
+    const temp = tempPassword();
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await bcrypt.hash(temp, 10), target.id]);
+    console.log('Mentor ' + req.user.username + ' reset the password for ' + target.username + ' (id ' + target.id + ')');
+    res.json({ success: true, username: target.username, tempPassword: temp });
+  } catch (err) { console.error('Mentor reset error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => {
   try {
     const students = await pool.query(
@@ -416,7 +454,8 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
             UNION ALL
             SELECT t.date AS d FROM trades t WHERE t.user_id = u.id AND ${JOURNALED_TRADE}
           ) jd) as last_journal_date,
-        (SELECT AVG(t.emotion_rating) FROM trades t WHERE t.user_id = u.id) as avg_emotion
+        (SELECT AVG(t.emotion_rating) FROM trades t WHERE t.user_id = u.id) as avg_emotion,
+        COALESCE(u.security_question, '') <> '' AS can_self_recover
        FROM users u WHERE u.is_mentor = FALSE ORDER BY u.username`
     );
     const result = students.rows.map(s => ({
@@ -424,7 +463,8 @@ app.get('/api/mentor/students', authMiddleware, mentorOnly, async (req, res) => 
       tradeCount: parseInt(s.trade_count), totalPnl: parseFloat(s.total_pnl),
       wins: parseInt(s.wins), winRate: s.trade_count > 0 ? (s.wins / s.trade_count * 100) : 0,
       lastTradeDate: s.last_trade_date, lastJournalDate: s.last_journal_date,
-      avgEmotion: s.avg_emotion ? parseFloat(s.avg_emotion) : 0
+      avgEmotion: s.avg_emotion ? parseFloat(s.avg_emotion) : 0,
+      canSelfRecover: s.can_self_recover
     }));
     res.json(result);
   } catch (err) {
