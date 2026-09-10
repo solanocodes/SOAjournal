@@ -287,10 +287,19 @@ const initDB = async () => {
         bringing TEXT DEFAULT '',
         kept_prior BOOLEAN,
         written_on VARCHAR(20) DEFAULT '',
+        -- Day 1 is an intake and day 90 a completion, both of which ask a third
+        -- question. Every day type has the same three roles: where I am
+        -- (learned), what I am committing to (bringing), and a day-specific
+        -- extra, so one shape serves all three without special-casing storage.
+        kind VARCHAR(16) DEFAULT 'daily',
+        extra TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(user_id, date)
       );
+
+      ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS kind VARCHAR(16) DEFAULT 'daily';
+      ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT '';
 
       CREATE TABLE IF NOT EXISTS payouts (
         id SERIAL PRIMARY KEY,
