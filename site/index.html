@@ -343,9 +343,12 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .ots-mini{width:6px;height:12px;border-radius:2px;background:var(--bg-card);flex-shrink:0}
 .ots-mini.ok{background:var(--accent)}
 .ots-mini.miss{background:rgba(220,80,80,.45)}
+.ots-stat-hd{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
 .ots-sbs{display:flex;flex-direction:column;gap:2px}
 .sbs-row{display:grid;grid-template-columns:118px 1fr 1fr;gap:14px;padding:13px 0;border-top:1px solid var(--border)}
 .sbs-row.empty{opacity:.55}
+.sbs-row.gap{background:rgba(212,175,90,.05)}
+.sbs-gap{font-size:11.5px;color:var(--yellow);font-weight:600}
 .sbs-day{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
 .sbs-d{font-size:12.5px;font-weight:700}
 .sbs-dt{font-size:10.5px;color:var(--text-muted);font-family:var(--mono)}
@@ -3269,7 +3272,19 @@ function saveOts(day){
 
 // ─── OTS: MENTOR ───
 function loadOtsMentor(){api('GET','/api/mentor/ots').then(d=>{_otsMentor=d||null;if(curView==='ots')ren()}).catch(e=>console.error(e))}
-function loadOtsStudent(id){_otsDetail=null;api('GET','/api/mentor/ots/'+id).then(d=>{_otsDetail=d;if(curView==='ots')ren()}).catch(e=>alert(e.message))}
+function loadOtsStudent(id){
+  _otsDetail=null;
+  api('GET','/api/mentor/ots/'+id).then(d=>{
+    _otsDetail=d;
+    const u=d.student.username;
+    if(curView==='ots')ren();
+    // The Mentor Panel's own detail feed backs the calendar and win rate.
+    if(!_cachedStudentDetail[u]){
+      const n=new Date();_stuCalY[u]=n.getFullYear();_stuCalM[u]=n.getMonth();
+      api('GET','/api/mentor/student/'+id).then(det=>{_cachedStudentDetail[u]=det;if(curView==='ots')ren()}).catch(e=>console.error(e));
+    }
+  }).catch(e=>alert(e.message));
+}
 function otsPick(id){_otsStudent=_otsStudent===id?null:id;if(_otsStudent)loadOtsStudent(id);else{_otsDetail=null;ren()}}
 
 function otsCohortHTML(){
@@ -3321,14 +3336,52 @@ function otsCohortHTML(){
 // Their words beside what they actually did that day. Same row, same date —
 // that alignment is the whole point of the page.
 function otsDetailHTML(){
-  const d=_otsDetail;
+  const d=_otsDetail,c=d.cohort;
+  const det=_cachedStudentDetail[d.student.username];
   let h='<div class="card"><div style="font-size:14px;font-weight:700;margin-bottom:4px">'+esc(d.student.fullName)+'</div>'+
-    '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px">@'+esc(d.student.username)+' · reflections beside that day’s trading</div>';
-  if(!d.rows.length){h+='<div style="font-size:12.5px;color:var(--text-muted)">The sprint has not started yet.</div></div>';return h}
+    '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px">@'+esc(d.student.username)+' · sprint and trading side by side</div>';
+
+  // How the sprint itself is going.
+  const written=d.rows.filter(r=>r.reflection).length;
+  const late=d.rows.filter(r=>r.reflection&&r.reflection.late).length;
+  const upTo=c.currentDay||0;
+  let missed=0;for(const r of d.rows)if(!r.reflection&&r.dayNum<upTo)missed++;
+  const kept=d.rows.filter(r=>r.reflection&&r.reflection.keptPrior===true).length;
+  const broke=d.rows.filter(r=>r.reflection&&r.reflection.keptPrior===false).length;
+  // Consecutive days written, counting back from the most recent elapsed day.
+  let streak=0;
+  for(const r of d.rows){if(r.dayNum>upTo)continue;if(r.reflection)streak++;else break}
+  const st=(l,v,col)=>'<div class="stat-card"><div class="stat-label">'+l+'</div><div class="stat-value" style="font-size:20px'+(col?';color:'+col:'')+'">'+v+'</div></div>';
+  h+='<div class="ots-stat-hd">Sprint</div><div class="stats-grid" style="margin-bottom:18px">'+
+     st('Days written',written+' / '+upTo)+
+     st('Missed',missed,missed?'var(--yellow)':'var(--text-primary)')+
+     st('Current streak',streak+'d')+
+     st('Written late',late,late?'var(--yellow)':'var(--text-primary)')+
+     (kept+broke?st('Kept their word',kept+' / '+(kept+broke),broke?'var(--yellow)':'var(--green)'):'')+
+     '</div>';
+
+  // The same trading picture the Mentor Panel shows, from the same feed.
+  if(det&&det.trades){
+    const ts=cStats(det.trades);
+    h+='<div class="ots-stat-hd">Trading · all time</div><div class="stats-grid">'+
+       st('Net P&L',f$(ts.np),ts.np>=0?'var(--green)':'var(--red)')+
+       st('Win rate',ts.wr.toFixed(1)+'%')+
+       st('Trades',ts.tot)+
+       st('Profit factor',ts.pf===Infinity?'∞':ts.pf.toFixed(2)+'×')+
+       st('Avg emotion',ts.avgEmo.toFixed(1)+'/10')+
+       '</div>';
+    h+=buildStudentCal(det.trades,d.student.username);
+  }else{
+    h+='<div style="font-size:12px;color:var(--text-muted);padding:14px 0">Loading their calendar…</div>';
+  }
+
+  if(!d.rows.length){h+='<div style="font-size:12.5px;color:var(--text-muted);margin-top:16px">The sprint has not started yet.</div></div>';return h}
+  h+='<div class="ots-stat-hd" style="margin-top:22px">Day by day</div>';
   h+='<div class="ots-sbs">';
   d.rows.forEach(r=>{
     const t=r.trading,rf=r.reflection;
-    h+='<div class="sbs-row'+(rf?'':' empty')+'">'+
+    const gap=!rf&&!!t;
+    h+='<div class="sbs-row'+(rf||t?'':' empty')+(gap?' gap':'')+'">'+
       '<div class="sbs-day"><span class="sbs-d">Day '+r.dayNum+'</span><span class="sbs-dt">'+fD(r.date)+'</span>'+
       (rf&&rf.late?'<span class="ots-late-tag">late</span>':'')+
       (rf&&rf.keptPrior===true?'<span class="ots-kept">kept</span>':rf&&rf.keptPrior===false?'<span class="ots-broke">missed</span>':'')+'</div>'+
@@ -3339,7 +3392,8 @@ function otsDetailHTML(){
               (rf.learned?'<div class="sbs-l"><em>'+esc(K.a)+'</em> '+esc(rf.learned)+'</div>':'')+
               (rf.extra&&K.c?'<div class="sbs-l"><em>'+esc(K.c)+'</em> '+esc(rf.extra)+'</div>':'')+
               (rf.bringing?'<div class="sbs-l"><em>'+esc(K.b)+'</em> '+esc(rf.bringing)+'</div>':'')})()
-        : '<div class="sbs-none">No reflection</div>')+'</div>'+
+        : gap?'<div class="sbs-gap">Traded, didn’t write it up</div>'
+             :'<div class="sbs-none">No reflection</div>')+'</div>'+
       '<div class="sbs-trade">'+(t
         ? '<div class="sbs-pnl" style="color:'+(t.pnl>=0?'var(--green)':'var(--red)')+'">'+f$(t.pnl)+'</div>'+
           '<div class="sbs-meta">'+t.trades+' trade'+(t.trades!==1?'s':'')+' · emotion '+t.avgEmotion+'/10 · '+t.avgRules+'/8 rules'+
