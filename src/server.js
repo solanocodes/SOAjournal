@@ -471,17 +471,27 @@ function otsShape(c) {
     endDate: isoAddDays(c.start_date, c.total_days - 1),
     today,
     // Before the start date currentDay is 0 and daysUntilStart counts down.
+    milestones: otsMilestones(c.total_days),
     currentDay: offset < 0 ? 0 : Math.min(offset + 1, c.total_days),
     daysUntilStart: offset < 0 ? -offset : 0,
     finished: offset + 1 > c.total_days
   };
 }
-// Day 1 takes stock, day 90 closes the loop, everything between is the daily
-// two questions. The day number decides which, so nothing has to be configured.
+// Day 1 takes stock, the thirds are milestones, the last day closes the loop,
+// everything else is the daily two questions. All derived from the day number,
+// so a cohort of any length gets checkpoints in the right places — 30 and 60 on
+// a 90-day sprint, 15 and 30 on a 45-day one.
+function otsMilestones(total) {
+  const a = Math.round(total / 3), b = Math.round(total * 2 / 3);
+  const out = [];
+  if (a > 1 && a < total) out.push(a);
+  if (b > 1 && b < total && b !== a) out.push(b);
+  return out;
+}
 function otsKind(day, total) {
   if (day === 1) return 'intake';
   if (day === total) return 'completion';
-  return 'daily';
+  return otsMilestones(total).includes(day) ? 'milestone' : 'daily';
 }
 const reflRow = r => ({
   date: r.date, dayNum: r.day_num, kind: r.kind || 'daily',
@@ -515,7 +525,7 @@ app.post('/api/ots/reflection', authMiddleware, async (req, res) => {
     const learned = String(req.body.learned || '').slice(0, 4000);
     const bringing = String(req.body.bringing || '').slice(0, 4000);
     const kind = otsKind(day, cohort.total_days);
-    // The extra field only exists on the intake and completion days.
+    // Every day type except the plain daily one asks a third question.
     const extra = kind === 'daily' ? '' : String(req.body.extra || '').slice(0, 4000);
     if (!learned.trim() && !bringing.trim() && !extra.trim()) return res.status(400).json({ error: 'Write something in at least one field' });
     // written_on is kept so a day filled in later is visibly late rather than
@@ -652,7 +662,9 @@ app.post('/api/mentor/ots/cohort', authMiddleware, mentorOnly, async (req, res) 
     await pool.query(
       `UPDATE ots_reflections SET kind = CASE WHEN day_num = 1 THEN 'intake'
                                              WHEN day_num = $1 THEN 'completion'
-                                             ELSE 'daily' END WHERE cohort_id = $2`, [days, c.id]);
+                                             WHEN day_num = ANY($2) THEN 'milestone'
+                                             ELSE 'daily' END WHERE cohort_id = $3`,
+      [days, otsMilestones(days), c.id]);
     res.json({ success: true, cohort: otsShape(c) });
   } catch (err) { if (migrating(err, res)) return; console.error('OTS cohort error:', err); res.status(500).json({ error: 'Server error' }); }
 });
