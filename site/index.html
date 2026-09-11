@@ -256,6 +256,27 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .stu-admin-note{font-size:11px;color:var(--text-muted)}
 .stu-pw{font-size:12px;color:var(--text-secondary);width:100%;line-height:1.6}
 .stu-pw code{font-family:var(--mono);background:var(--bg-elevated);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:13px;color:var(--accent);user-select:all}
+.bk-wrap{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,7,.975);backdrop-filter:blur(3px);animation:bkIn .32s ease both}
+.bk-wrap.out{animation:bkOut .3s ease both}
+@keyframes bkIn{from{opacity:0}to{opacity:1}}
+@keyframes bkOut{to{opacity:0}}
+.bk-card{max-width:560px;width:100%;text-align:center}
+.bk-head{font-size:clamp(30px,7vw,48px);font-weight:800;letter-spacing:-.03em;animation:bkRise .6s .1s ease both}
+.bk-sub{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-top:8px;animation:bkRise .6s .22s ease both}
+.bk-grid{display:grid;grid-template-columns:repeat(15,1fr);gap:4px;margin:28px auto;max-width:380px}
+.bk-c{aspect-ratio:1;border-radius:2px;background:rgba(255,255,255,.07);animation:bkCell .5s both;animation-delay:calc(.3s + var(--i) * 16ms)}
+.bk-c.lit{background:var(--accent)}
+@keyframes bkCell{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+@keyframes bkRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.bk-q{font-size:clamp(17px,3.4vw,22px);line-height:1.5;font-style:italic;max-width:460px;margin:0 auto;animation:bkRise .7s 1.9s ease both}
+.bk-a{font-size:11.5px;color:var(--text-muted);letter-spacing:.04em;margin-top:12px;animation:bkRise .7s 2.1s ease both}
+.bk-then{display:flex;flex-direction:column;gap:14px;text-align:left;max-width:480px;margin:0 auto;animation:bkRise .7s 1.9s ease both}
+.bk-row{display:flex;gap:12px;align-items:flex-start}
+.bk-row em{font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);min-width:46px;padding-top:4px}
+.bk-row span{font-size:14.5px;line-height:1.6;color:var(--text-secondary)}
+.bk-btn{margin-top:30px;background:var(--accent);border:0;color:var(--bg-base);font-size:13px;font-weight:700;padding:11px 30px;border-radius:9px;cursor:pointer;animation:bkRise .7s 2.35s ease both}
+.bk-btn:hover{filter:brightness(1.08)}
+@media(prefers-reduced-motion:reduce){.bk-wrap,.bk-wrap *{animation-duration:.01ms!important;animation-delay:0s!important}}
 .ots-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .ots-t{font-size:20px;font-weight:800;letter-spacing:-.01em}
 .ots-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
@@ -2972,6 +2993,50 @@ function loadOts(){return api('GET','/api/ots').then(d=>{_ots=d||null}).catch(()
 // Day 1 takes stock, day 90 closes the loop against it, everything between is
 // the daily two questions. Field roles stay the same across all three — where I
 // am, what I'm committing to, and a day-specific third — so one form renders all.
+// ── The two days that matter ──
+// Day one and the last day get a moment. It is built out of the trader's own
+// ninety days — their words, their count of days kept — because a receipt of
+// what they actually did carries more than confetti would, and this room has
+// already told us the app must not feel childish.
+function otsBookend(kind){
+  const c=_ots&&_ots.cohort;if(!c)return;
+  const refl=_ots.reflections||[];
+  const byDate={};refl.forEach(r=>{byDate[r.date]=r});
+  const first=byDate[c.startDate],last=byDate[otsAdd(c.startDate,c.totalDays-1)];
+  const T=c.totalDays;
+  const cells=Array.from({length:T},(_,i)=>{
+    const lit=kind==='completion'?!!byDate[otsAdd(c.startDate,i)]:false;
+    return '<span class="bk-c'+(lit?' lit':'')+'" style="--i:'+i+'"></span>';
+  }).join('');
+
+  let head,sub,body;
+  if(kind==='intake'){
+    head=esc(c.name);sub=T+' days start now';
+    body=(first&&first.bringing)
+      ? '<div class="bk-q">“'+esc(first.bringing)+'”</div><div class="bk-a">what you said you are here for</div>'
+      : '<div class="bk-a">Day 1 of '+T+'. Every day from here is one you either wrote or didn’t.</div>';
+  }else{
+    const done=refl.length;
+    head=T+' days';sub=done+' of '+T+' days written';
+    body='<div class="bk-then">'+
+      (first&&first.learned?'<div class="bk-row"><em>Day 1</em><span>“'+esc(first.learned)+'”</span></div>':'')+
+      (last&&last.learned?'<div class="bk-row"><em>Day '+T+'</em><span>“'+esc(last.learned)+'”</span></div>':'')+
+      '</div>';
+  }
+
+  const el=document.createElement('div');
+  el.className='bk-wrap '+kind;
+  el.innerHTML='<div class="bk-card">'+
+    '<div class="bk-head">'+head+'</div><div class="bk-sub">'+sub+'</div>'+
+    '<div class="bk-grid">'+cells+'</div>'+body+
+    '<button class="bk-btn">'+(kind==='intake'?'Begin':'Close')+'</button></div>';
+  const close=()=>{el.classList.add('out');setTimeout(()=>el.remove(),320)};
+  el.querySelector('.bk-btn').onclick=close;
+  el.onclick=e=>{if(e.target===el)close()};
+  document.addEventListener('keydown',function esc2(ev){if(ev.key==='Escape'){close();document.removeEventListener('keydown',esc2)}});
+  document.body.appendChild(el);
+}
+
 // ── Daily prompt rotation ──
 // Sixteen looking-back questions, one per day, cycling. Keyed off the day number
 // so it is deterministic and cohort-wide: everyone in OTS 1 gets the same
@@ -3162,6 +3227,8 @@ function rOts(el){
   const past=(_ots.reflections||[]).slice().reverse();
   if(past.length){
     h+='<div style="font-size:13px;font-weight:600;margin:20px 0 10px">Everything so far</div>';
+    if(byDate[otsAdd(c.startDate,c.totalDays-1)])
+      h+='<button class="btn-sm" style="margin-bottom:10px" onclick="otsBookend(\'completion\')">Replay your '+c.totalDays+' days</button>';
     past.forEach(r=>{h+='<div class="ots-past"><div class="ots-past-hd">Day '+r.dayNum+' · '+fD(r.date)+
       (r.late?' <span class="ots-late-tag">late</span>':'')+
       (r.keptPrior===true?' <span class="ots-kept">kept</span>':r.keptPrior===false?' <span class="ots-broke">missed</span>':'')+'</div>'+
@@ -3191,8 +3258,12 @@ function saveOts(day){
   const T=_ots.cohort.totalDays,W=otsWindow(day,T),tx=v=>typeof v==='function'?v(T,W,day):v;
   const body={date,learned,bringing,extra,promptA:tx(K.learned.l),promptB:tx(K.bringing.l)};
   if(_otsKept!==null)body.keptPrior=_otsKept;
+  // Whether this day already existed decides if the bookend lands — editing day 1
+  // in week six should not replay the starting gun.
+  const wasNew=!(_ots.reflections||[]).some(r=>r.date===date);
   api('POST','/api/ots/reflection',body).then(()=>loadOts()).then(()=>{_otsKept=null;ren();
     const m=document.getElementById('otsMsg');if(m){m.style.color='var(--green)';m.textContent='Saved.'}
+    if(wasNew&&(kind==='intake'||kind==='completion'))setTimeout(()=>otsBookend(kind),260);
   }).catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
 }
 
