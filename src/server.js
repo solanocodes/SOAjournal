@@ -817,7 +817,38 @@ app.get('/api/mentor/notes/:studentId', authMiddleware, mentorOnly, async (req, 
 // AI JOURNAL ANALYSIS
 // ═══════════════════════════════════
 
+const COACH_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
+
+// Every way Delta could fail used to arrive as the same sentence, so neither the
+// trader nor the mentor could tell a retired model from an empty balance. Name
+// what actually happened, and keep the last one for /api/health.
+let lastCoachError = null;
+function coachFailure(err, where) {
+  const status = err && (err.status || err.statusCode);
+  const type = err && err.error && err.error.error && err.error.error.type;
+  const raw = String((err && err.message) || err || 'unknown');
+  let msg;
+  if (status === 401 || type === 'authentication_error')
+    msg = 'Delta\'s API key was rejected. Sean needs to check ANTHROPIC_API_KEY.';
+  else if (status === 403 || type === 'permission_error')
+    msg = 'Delta\'s API key is not permitted to use this model. Sean needs to check the Anthropic account.';
+  else if (status === 404 || type === 'not_found_error')
+    msg = 'Delta\'s model (' + COACH_MODEL + ') is not available on this account. Sean needs to set ANTHROPIC_MODEL to a current one.';
+  else if (/credit balance|billing|quota/i.test(raw))
+    msg = 'The Anthropic account is out of credit. Sean needs to top it up.';
+  else if (status === 429 || type === 'rate_limit_error')
+    msg = 'Delta is rate limited right now — give it a minute and try again.';
+  else if (status === 529 || status === 503 || type === 'overloaded_error')
+    msg = 'Anthropic is overloaded right now. This usually clears in a few minutes.';
+  else if (status >= 500)
+    msg = 'Anthropic returned an error. Try again shortly.';
+  else
+    msg = 'Delta hit an error: ' + raw.slice(0, 160);
+  lastCoachError = { at: new Date().toISOString(), where, status: status || null, type: type || null, message: raw.slice(0, 300), shown: msg };
+  console.error('Coach failure [' + where + ']', status || '', type || '', raw);
+  return msg;
+}
 
 const AI_SYSTEM_PROMPT = `You are an expert trading coach for the SOA (Solano Options Academy) trading system. You analyze a student's daily trading journal and provide direct, specific, actionable feedback.
 
@@ -844,7 +875,7 @@ Your coaching style:
 - Keep it under 500 words — dense and useful, not padded`;
 
 app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
-  if (!anthropic) return res.status(503).json({ error: 'AI analysis not available' });
+  if (!anthropic) return res.status(503).json({ error: 'Delta is not configured — ANTHROPIC_API_KEY is not set on the server.', coachDown: true });
 
   try {
     const { dayTrades, journal, recentHistory, riskPlan, date } = req.body;
@@ -886,7 +917,7 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
     if (pbA) sysA.push({ type: 'text', text: '=== SOA PLAYBOOK (the mentor\'s system — analyze against this) ===\n' + pbA.text });
     sysA[sysA.length - 1].cache_control = { type: 'ephemeral' };
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: COACH_MODEL,
       max_tokens: 800,
       system: sysA,
       messages: [{ role: 'user', content: prompt }]
@@ -895,8 +926,7 @@ app.post('/api/ai/journal-analysis', authMiddleware, async (req, res) => {
     const analysis = message.content[0]?.text || '';
     res.json({ analysis });
   } catch (err) {
-    console.error('AI analysis error:', err);
-    res.status(500).json({ error: 'AI analysis failed' });
+    res.status(503).json({ error: coachFailure(err, 'analysis'), coachDown: true });
   }
 });
 
@@ -1168,7 +1198,7 @@ app.get('/api/coach/history', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/coach/chat', authMiddleware, async (req, res) => {
-  if (!anthropic) return res.status(503).json({ error: 'Coach is not configured yet' });
+  if (!anthropic) return res.status(503).json({ error: 'Delta is not configured — ANTHROPIC_API_KEY is not set on the server.', coachDown: true });
   try {
     const { message, image, doc } = req.body;
     if (!message && !image && !doc) return res.status(400).json({ error: 'Empty message' });
@@ -1265,7 +1295,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     let finished = false;
     for (let i = 0; i < 10; i++) {
       const stream = anthropic.messages.stream({
-        model: 'claude-sonnet-4-6', max_tokens: 2000,
+        model: COACH_MODEL, max_tokens: 2000,
         system: sys, tools: COACH_TOOLS, messages
       });
       stream.on('text', emit);
@@ -1285,7 +1315,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     if (!finished) {
       try {
         const fin = anthropic.messages.stream({
-          model: 'claude-sonnet-4-6', max_tokens: 1500,
+          model: COACH_MODEL, max_tokens: 1500,
           system: sys, tools: COACH_TOOLS, tool_choice: { type: 'none' },
           messages: [...messages, { role: 'user', content: 'Wrap up now in plain text: summarize what you just did and learned (including anything you saved to memory), and what the trader should know or do next.' }]
         });
@@ -1297,9 +1327,9 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     await pool.query('INSERT INTO coach_messages (user_id, role, content) VALUES ($1,$2,$3)', [req.user.id, 'assistant', reply]);
     res.end();
   } catch (err) {
-    console.error('Coach chat error:', err);
-    if (res.headersSent) { try { res.write('\n\n**The coach hit an error — try that again.**'); res.end(); } catch (e) {} }
-    else res.status(500).json({ error: 'Coach is unavailable right now' });
+    const msg = coachFailure(err, 'chat');
+    if (res.headersSent) { try { res.write('\n\n**' + msg + '**'); res.end(); } catch (e) {} }
+    else res.status(503).json({ error: msg, coachDown: true });
   }
 });
 
@@ -1771,7 +1801,8 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, db: dbReady, uptime: Math.round(process.uptime()),
     schemaFailures: initFailures.length,
     schema: initFailures.map(f => ({ statement: f.statement, code: f.code, error: f.error })),
-    lastInitError: lastInitError || null, initAttempts });
+    lastInitError: lastInitError || null, initAttempts,
+    coach: { configured: !!anthropic, model: COACH_MODEL, lastError: lastCoachError } });
 });
 
 app.get('*', (req, res) => {
