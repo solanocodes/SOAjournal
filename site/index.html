@@ -277,6 +277,9 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .bk-btn{margin-top:30px;background:var(--accent);border:0;color:var(--bg-base);font-size:13px;font-weight:700;padding:11px 30px;border-radius:9px;cursor:pointer;animation:bkRise .7s 2.35s ease both}
 .bk-btn:hover{filter:brightness(1.08)}
 @media(prefers-reduced-motion:reduce){.bk-wrap,.bk-wrap *{animation-duration:.01ms!important;animation-delay:0s!important}}
+.coach-fallback{margin-top:11px}
+.coach-fallback button{background:var(--accent);border:0;color:var(--bg-base);font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer}
+.coach-fallback button:hover{filter:brightness(1.08)}
 .ots-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .ots-t{font-size:20px;font-weight:800;letter-spacing:-.01em}
 .ots-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
@@ -1610,6 +1613,7 @@ function renderCoach(){
   }else{
     m.innerHTML=_coachHist.map(x=>{
       let inner=coachMdEsc(x.content);
+      if(x.fallback)inner+='<div class="coach-fallback"><button onclick="sv(\'journal\')">Open the Daily Journal</button></div>';
       if(x.img)inner+=`<img class="coach-msg-img" src="${x.img}" onclick="openScreenshot(this.src)">`;
       else if(x.has_image&&x.role==='user')inner+='<div class="coach-att-note">chart attached</div>';
       return`<div class="coach-msg ${x.role==='user'?'me':'ai'}"><div class="coach-bubble">${inner}</div></div>`;
@@ -1707,7 +1711,11 @@ function sendCoach(){
     _coachHist.push({role:'assistant',content:live||'…'});
     if(/journal|debrief/i.test(live))api('GET','/api/journals').then(j=>{_cachedJournals=j||_cachedJournals}).catch(()=>{});
   }).catch(err=>{
-    _coachHist.push({role:'assistant',content:'**'+(err.message||'Coach is unavailable right now')+'**'});
+    // coachMdEsc escapes markup on purpose — coach output is model-generated — so
+    // the way out is a real button beside the message, not a link inside it.
+    const m=err.message||'Delta is unavailable right now.';
+    _coachHist.push({role:'assistant',content:'**'+m+'**\n\nYou can still journal today without me. '+
+      'The Daily Journal needs no AI, and it counts for the roll call exactly the same — no-trade days included.',fallback:true});
   }).finally(()=>{
     _coachBusy=false;const b=document.getElementById('coachSendBtn');if(b)b.disabled=false;
     const t=document.getElementById('coachTyping');if(t)t.remove();
