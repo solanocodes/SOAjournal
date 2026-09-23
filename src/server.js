@@ -488,10 +488,18 @@ function otsMilestones(total) {
   if (b > 1 && b < total && b !== a) out.push(b);
   return out;
 }
-function otsKind(day, total) {
+function otsIsWeekend(iso) {
+  const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10))).getUTCDay();
+  return d === 0 || d === 6;
+}
+// Anchors outrank the calendar: a milestone or the completion landing on a
+// Saturday is still a milestone. Everything else on a weekend is optional.
+function otsKind(day, total, startDate) {
   if (day === 1) return 'intake';
   if (day === total) return 'completion';
-  return otsMilestones(total).includes(day) ? 'milestone' : 'daily';
+  if (otsMilestones(total).includes(day)) return 'milestone';
+  if (startDate && otsIsWeekend(isoAddDays(startDate, day - 1))) return 'weekend';
+  return 'daily';
 }
 const reflRow = r => ({
   date: r.date, dayNum: r.day_num, kind: r.kind || 'daily',
@@ -524,9 +532,9 @@ app.post('/api/ots/reflection', authMiddleware, async (req, res) => {
     if (date > etTodayStr()) return res.status(400).json({ error: 'You cannot reflect on a day that has not happened' });
     const learned = String(req.body.learned || '').slice(0, 4000);
     const bringing = String(req.body.bringing || '').slice(0, 4000);
-    const kind = otsKind(day, cohort.total_days);
-    // Every day type except the plain daily one asks a third question.
-    const extra = kind === 'daily' ? '' : String(req.body.extra || '').slice(0, 4000);
+    const kind = otsKind(day, cohort.total_days, cohort.start_date);
+    // Only the anchor days ask a third question.
+    const extra = (kind === 'daily' || kind === 'weekend') ? '' : String(req.body.extra || '').slice(0, 4000);
     if (!learned.trim() && !bringing.trim() && !extra.trim()) return res.status(400).json({ error: 'Write something in at least one field' });
     // written_on is kept so a day filled in later is visibly late rather than
     // quietly passing as done — otherwise the tracker lies about the one thing
@@ -660,10 +668,12 @@ app.post('/api/mentor/ots/cohort', authMiddleware, mentorOnly, async (req, res) 
     await pool.query(
       `UPDATE ots_reflections SET day_num = (DATE(date) - DATE($1)) + 1 WHERE cohort_id = $2`, [start, c.id]);
     await pool.query(
-      `UPDATE ots_reflections SET kind = CASE WHEN day_num = 1 THEN 'intake'
-                                             WHEN day_num = $1 THEN 'completion'
-                                             WHEN day_num = ANY($2) THEN 'milestone'
-                                             ELSE 'daily' END WHERE cohort_id = $3`,
+      `UPDATE ots_reflections SET kind = CASE
+          WHEN day_num = 1 THEN 'intake'
+          WHEN day_num = $1 THEN 'completion'
+          WHEN day_num = ANY($2) THEN 'milestone'
+          WHEN EXTRACT(DOW FROM DATE(date)) IN (0, 6) THEN 'weekend'
+          ELSE 'daily' END WHERE cohort_id = $3`,
       [days, otsMilestones(days), c.id]);
     res.json({ success: true, cohort: otsShape(c) });
   } catch (err) { if (migrating(err, res)) return; console.error('OTS cohort error:', err); res.status(500).json({ error: 'Server error' }); }
