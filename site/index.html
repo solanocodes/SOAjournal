@@ -342,6 +342,9 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .ots-row-hd{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
 .ots-row-n{font-size:13px;font-weight:600}
 .ots-row-m{font-size:11px;color:var(--text-muted);font-family:var(--mono)}
+.ots-row-u{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);font-weight:400;margin-left:5px}
+.ots-drop{background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:10.5px;padding:2px 9px;border-radius:6px;cursor:pointer;margin-left:10px;font-family:inherit}
+.ots-drop:hover{border-color:var(--red);color:var(--red)}
 .ots-minis{display:flex;gap:2px;flex-wrap:wrap}
 .ots-mini{width:6px;height:12px;border-radius:2px;background:var(--bg-card);flex-shrink:0}
 .ots-mini.ok{background:var(--accent)}
@@ -3328,10 +3331,13 @@ function otsCohortHTML(){
       cells+='<span class="ots-mini '+st+'" title="Day '+d+'"></span>';
     }
     h+='<div class="ots-row'+(_otsStudent===m.id?' active':'')+'" onclick="otsPick('+m.id+')">'+
-      '<div class="ots-row-hd"><span class="ots-row-n">'+esc(m.fullName)+'</span>'+
+      '<div class="ots-row-hd"><span class="ots-row-n">'+esc(m.fullName)+
+      (m.fullName!==m.username?' <span class="ots-row-u">@'+esc(m.username)+'</span>':'')+'</span>'+
       '<span class="ots-row-m">'+m.done+'/'+upTo+' written'+(m.late?' · '+m.late+' late':'')+
       (missed?' · <strong style="color:var(--yellow)">'+missed+' missed</strong>':'')+
-      (upTo>0&&!todayDone?' · <span style="color:var(--text-muted)">today open</span>':'')+'</span></div>'+
+      (upTo>0&&!todayDone?' · <span style="color:var(--text-muted)">today open</span>':'')+
+      '<button class="ots-drop" title="Remove from the cohort" onclick="event.stopPropagation();otsDrop('+m.id+',\''+esc(m.username).replace(/'/g,'')+'\','+m.done+')">Remove</button>'+
+      '</span></div>'+
       '<div class="ots-minis">'+cells+'</div></div>';
   });
   h+='</div></div>';
@@ -3426,6 +3432,17 @@ function otsSaveDates(){
     .then(([,m])=>{_otsMentor=m;ren();
       const x=document.getElementById('otsDateMsg');if(x){x.style.color='var(--green)';x.textContent='Saved.'}})
     .catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
+// Removing someone takes them off the roster only. What they wrote stays in the
+// database, so putting them back restores their history rather than starting
+// them over.
+function otsDrop(id,username,written){
+  const kept=written?'\n\nTheir '+written+' reflection'+(written===1?'':'s')+' stay saved — adding them back restores their history.':'';
+  if(!confirm('Remove @'+username+' from this cohort?'+kept))return;
+  api('DELETE','/api/mentor/ots/members/'+id).then(()=>{
+    if(_otsStudent===id){_otsStudent=null;_otsDetail=null}
+    loadOtsMentor();
+  }).catch(e=>alert(e.message));
 }
 function otsEnrol(){
   const el=document.getElementById('otsAddUser'),msg=document.getElementById('otsAddMsg');
