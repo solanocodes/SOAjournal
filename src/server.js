@@ -1019,7 +1019,9 @@ DAILY DEBRIEF: this is how the trader journals. When they want to talk about the
 
 INTAKE: if your memory of this trader is empty, run a short interview before general coaching — ONE question per message, max five questions total: (1) account situation — personal or prop/funded, whose, payout rules; (2) their entry model — invite them to paste any written version; (3) the mistake they already know they keep making; (4) their 90-day goal; (5) what to hold them accountable for and whether they want blunt or gentle coaching. Save each answer with remember(). After the last question, summarize what you learned in 3-4 bullets and invite questions.
 
-ACCOUNTS AND MONEY: get_accounts is the only thing that knows which accounts this trader has. Call it before you say anything about an account, a balance, a drawdown limit, a buffer or a withdrawal — including when you think you already know. Never name an account, a size or a balance that is not in the result you just got back; if the list is empty they have no accounts set up, and that is the answer. When a field comes back null it is NOT SET: say which number you are missing and ask for it or point them at the Prop Firms tab. Never fill the gap with what a firm "typically" requires — being wrong about a drawdown limit can cost someone a funded account, and a stated guess is worse than an admitted blank. Balances computed from closed trades cannot see intraday peaks, so when the tool flags a high-water mark as a lower bound, treat the room to the floor as the best case and say so. Never give a pull-the-money verdict you would have to walk back one message later: if a number you need is missing, get it first.
+ACCOUNTS AND MONEY: there are two separate things and they live in different places. ACCOUNTS are live balances, drawdown floors and what is withdrawable — get_accounts reads them, and the trader configures them in Settings. The LEDGER is money that changed hands: evaluations, resets, activations, data fees and payouts — get_prop_ledger reads it, and the trader enters it in the Prop Firms tab. Someone can have a full ledger and no accounts, or the reverse, so when one comes back empty check the other before concluding they have nothing. Never send them to the Prop Firms tab to enter a balance or a drawdown, or to Settings to enter spend.
+
+get_accounts is the only thing that knows which accounts this trader has. Call it before you say anything about an account, a balance, a drawdown limit, a buffer or a withdrawal — including when you think you already know. Never name an account, a size or a balance that is not in the result you just got back; if the list is empty they have no accounts set up, and that is the answer. When a field comes back null it is NOT SET: say which number you are missing and ask for it or point them at Settings, where accounts are configured. Never fill the gap with what a firm "typically" requires — being wrong about a drawdown limit can cost someone a funded account, and a stated guess is worse than an admitted blank. Balances computed from closed trades cannot see intraday peaks, so when the tool flags a high-water mark as a lower bound, treat the room to the floor as the best case and say so. Never give a pull-the-money verdict you would have to walk back one message later: if a number you need is missing, get it first.
 
 DATES: all dates are US Eastern trading days. The conversation history can span several days and is marked with session dates — never assume the last thing discussed was today. Before saying a journal already exists for today, confirm it with get_journal_entries for today's date rather than relying on the conversation. "Today" is the date given in the trader snapshot below — trust it over any other notion of the current date, and use it when calling save_journal for today's debrief.
 
@@ -1056,6 +1058,10 @@ const COACH_TOOLS = [
       observations: { type: 'string', description: 'Market/behavior observations from the debrief' },
       gameplan: { type: 'string', description: 'Tomorrow\'s plan' }
     }, required: ['date'] } },
+  { name: 'get_prop_ledger', description: 'What this trader has SPENT on prop firms and what they have been PAID OUT, for a given month, plus an all-time breakdown per firm. This is separate from get_accounts: an account is a live balance and drawdown, a ledger entry is money that changed hands (evaluations, resets, activations, data fees, payouts). Call this for anything about spend, fees, payouts, ROI, or whether a firm has paid for itself. A trader can have no accounts configured and still have a full ledger.',
+    input_schema: { type: 'object', properties: {
+      month: { type: 'string', description: 'YYYY-MM. Omit for the current month.' }
+    } } },
   { name: 'get_accounts', description: 'The trader\'s prop firm accounts with live balances, drawdown floors, room to the floor and payout progress. This is the ONLY source of truth about which accounts exist and what they are worth. Call it before answering anything about accounts, balances, drawdown, buffers or withdrawals. If it returns an empty list the trader has no accounts set up — say so; never infer an account from anything else.',
     input_schema: { type: 'object', properties: {} } },
   { name: 'remember', description: 'Save a durable BEHAVIOURAL fact about this trader — a commitment they made, a pattern you noticed, a rule they keep breaking, a question to revisit. Never store numbers that change: balances, account sizes, drawdown limits, buffers and payout thresholds live in get_accounts and get_risk_plan, and a stale copy here would be quoted back as fact forever.',
@@ -1158,6 +1164,21 @@ async function coachTool(name, input, userId) {
          lessons=EXCLUDED.lessons, observations=EXCLUDED.observations, gameplan=EXCLUDED.gameplan`,
       [userId, d, sat, emo, bia, les, obs, gp]);
     return { saved: true, date: d };
+  }
+  if (name === 'get_prop_ledger') {
+    const L = await propLedger(userId, input.month);
+    if (!L.costs.length && !L.payouts.length && !L.byFirm.length)
+      return { month: L.month, empty: true, note: 'Nothing logged in the prop firm ledger at all — no spend and no payouts. Do not infer any; ask them to add it in the Prop Firms tab.' };
+    return {
+      month: L.month, spent: L.spent, paid_out: L.paid, net: L.net,
+      roi_percent: L.roi,
+      roi_note: L.roi === null ? 'Nothing spent this month, so ROI cannot be computed.' : 'Payouts minus spend, over spend.',
+      spend_by_category: L.byCategory,
+      entries_this_month: L.costs.map(c => ({ date: c.date, what: c.category, firm: c.firm, amount: c.amount, note: c.note }))
+        .concat(L.payouts.map(p => ({ date: p.date, what: 'payout', firm: p.firm, amount: p.amount, note: p.note }))),
+      all_time_by_firm: L.byFirm, all_time: L.lifetime,
+      months_with_entries: L.months
+    };
   }
   if (name === 'get_accounts') {
     const list = await computeAccounts(userId);
@@ -1535,16 +1556,15 @@ function monthBounds(month) {
 const costRow = r => ({ id: r.id, accountId: r.account_id, firm: r.firm || '', date: r.date,
   category: r.category || 'other', amount: parseFloat(r.amount), note: r.note || '' });
 
-app.get('/api/prop/ledger', authMiddleware, async (req, res) => {
-  try {
-    const b = monthBounds(req.query.month);
+async function propLedger(userId, month) {
+    const b = monthBounds(month);
     const [costs, pays, allCosts, allPays] = await Promise.all([
-      pool.query('SELECT * FROM prop_costs WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [req.user.id, b.from, b.to]),
-      pool.query('SELECT * FROM payouts WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [req.user.id, b.from, b.to]),
-      pool.query('SELECT firm, account_id, date, amount, category FROM prop_costs WHERE user_id = $1', [req.user.id]),
-      pool.query('SELECT firm, account_id, date, amount FROM payouts WHERE user_id = $1', [req.user.id])
+      pool.query('SELECT * FROM prop_costs WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [userId, b.from, b.to]),
+      pool.query('SELECT * FROM payouts WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [userId, b.from, b.to]),
+      pool.query('SELECT firm, account_id, date, amount, category FROM prop_costs WHERE user_id = $1', [userId]),
+      pool.query('SELECT firm, account_id, date, amount FROM payouts WHERE user_id = $1', [userId])
     ]);
-    const accts = (await pool.query('SELECT id, name, firm FROM accounts WHERE user_id = $1', [req.user.id])).rows;
+    const accts = (await pool.query('SELECT id, name, firm FROM accounts WHERE user_id = $1', [userId])).rows;
     const firmOf = r => r.firm || (accts.find(a => a.id === r.account_id) || {}).firm || 'Unassigned';
 
     const sum = rows => Math.round(rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0) * 100) / 100;
@@ -1570,7 +1590,7 @@ app.get('/api/prop/ledger', authMiddleware, async (req, res) => {
     // Every month that has anything in it, so the picker only offers real ones.
     const months = [...new Set(allCosts.rows.concat(allPays.rows).map(r => String(r.date).slice(0, 7)))].sort().reverse();
 
-    res.json({
+    return {
       month: b.key, spent, paid,
       net: Math.round((paid - spent) * 100) / 100, roi,
       byCategory: byCat,
@@ -1581,7 +1601,12 @@ app.get('/api/prop/ledger', authMiddleware, async (req, res) => {
         roi: lifeSpent > 0 ? Math.round((lifePaid - lifeSpent) / lifeSpent * 1000) / 10 : null },
       months,
       accounts: accts.map(a => ({ id: a.id, name: a.name, firm: a.firm || '' }))
-    });
+    };
+}
+
+app.get('/api/prop/ledger', authMiddleware, async (req, res) => {
+  try {
+    res.json(await propLedger(req.user.id, req.query.month));
   } catch (err) { if (migrating(err, res)) return; console.error('Ledger error:', err); res.status(500).json({ error: 'Server error' }); }
 });
 
