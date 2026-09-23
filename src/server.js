@@ -1519,13 +1519,106 @@ function migrating(err, res) {
   return false;
 }
 
+// ═══════════════════════════════════
+// PROP FIRM LEDGER
+// ═══════════════════════════════════
+// Prop trading has an expense side — evaluations, resets, activations, data —
+// that a P&L curve never shows. A trader can be up on the charts and down on the
+// business. This is the month's money in against the month's money out.
+const COST_CATEGORIES = ['evaluation', 'reset', 'activation', 'data', 'other'];
+
+function monthBounds(month) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
+  if (!m) { const p = etParts(); return { from: `${p.year}-${p.month}-01`, to: `${p.year}-${p.month}-31`, key: `${p.year}-${p.month}` }; }
+  return { from: month + '-01', to: month + '-31', key: month };
+}
+const costRow = r => ({ id: r.id, accountId: r.account_id, firm: r.firm || '', date: r.date,
+  category: r.category || 'other', amount: parseFloat(r.amount), note: r.note || '' });
+
+app.get('/api/prop/ledger', authMiddleware, async (req, res) => {
+  try {
+    const b = monthBounds(req.query.month);
+    const [costs, pays, allCosts, allPays] = await Promise.all([
+      pool.query('SELECT * FROM prop_costs WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [req.user.id, b.from, b.to]),
+      pool.query('SELECT * FROM payouts WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC, id DESC', [req.user.id, b.from, b.to]),
+      pool.query('SELECT firm, account_id, date, amount, category FROM prop_costs WHERE user_id = $1', [req.user.id]),
+      pool.query('SELECT firm, account_id, date, amount FROM payouts WHERE user_id = $1', [req.user.id])
+    ]);
+    const accts = (await pool.query('SELECT id, name, firm FROM accounts WHERE user_id = $1', [req.user.id])).rows;
+    const firmOf = r => r.firm || (accts.find(a => a.id === r.account_id) || {}).firm || 'Unassigned';
+
+    const sum = rows => Math.round(rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0) * 100) / 100;
+    const spent = sum(costs.rows), paid = sum(pays.rows);
+    // ROI is only meaningful once something has been spent; a payout with no
+    // outlay behind it is not an infinite return, it is an unknown one.
+    const roi = spent > 0 ? Math.round((paid - spent) / spent * 1000) / 10 : null;
+
+    const byCat = {};
+    costs.rows.forEach(r => { const k = r.category || 'other'; byCat[k] = Math.round(((byCat[k] || 0) + parseFloat(r.amount)) * 100) / 100; });
+
+    // All-time per firm: which of them has actually paid for itself.
+    const firms = {};
+    allCosts.rows.forEach(r => { const f = firmOf(r); (firms[f] = firms[f] || { firm: f, spent: 0, paid: 0 }).spent += parseFloat(r.amount); });
+    allPays.rows.forEach(r => { const f = firmOf(r); (firms[f] = firms[f] || { firm: f, spent: 0, paid: 0 }).paid += parseFloat(r.amount); });
+    const byFirm = Object.values(firms).map(f => ({
+      firm: f.firm, spent: Math.round(f.spent * 100) / 100, paid: Math.round(f.paid * 100) / 100,
+      net: Math.round((f.paid - f.spent) * 100) / 100,
+      roi: f.spent > 0 ? Math.round((f.paid - f.spent) / f.spent * 1000) / 10 : null
+    })).sort((a, b) => b.net - a.net);
+
+    const lifeSpent = sum(allCosts.rows), lifePaid = sum(allPays.rows);
+    // Every month that has anything in it, so the picker only offers real ones.
+    const months = [...new Set(allCosts.rows.concat(allPays.rows).map(r => String(r.date).slice(0, 7)))].sort().reverse();
+
+    res.json({
+      month: b.key, spent, paid,
+      net: Math.round((paid - spent) * 100) / 100, roi,
+      byCategory: byCat,
+      costs: costs.rows.map(costRow),
+      payouts: pays.rows.map(r => ({ id: r.id, accountId: r.account_id, firm: firmOf(r), date: r.date, amount: parseFloat(r.amount), note: r.note || '' })),
+      byFirm,
+      lifetime: { spent: lifeSpent, paid: lifePaid, net: Math.round((lifePaid - lifeSpent) * 100) / 100,
+        roi: lifeSpent > 0 ? Math.round((lifePaid - lifeSpent) / lifeSpent * 1000) / 10 : null },
+      months,
+      accounts: accts.map(a => ({ id: a.id, name: a.name, firm: a.firm || '' }))
+    });
+  } catch (err) { if (migrating(err, res)) return; console.error('Ledger error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/prop/costs', authMiddleware, async (req, res) => {
+  try {
+    const c = req.body;
+    const amt = parseFloat(c.amount);
+    if (!isFinite(amt) || amt <= 0) return res.status(400).json({ error: 'Enter an amount greater than zero' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.date || ''))) return res.status(400).json({ error: 'Pick a date' });
+    let firm = String(c.firm || '').slice(0, 80);
+    if (c.accountId) {
+      const own = (await pool.query('SELECT id, firm FROM accounts WHERE id = $1 AND user_id = $2', [c.accountId, req.user.id])).rows[0];
+      if (!own) return res.status(404).json({ error: 'Account not found' });
+      if (!firm) firm = own.firm || '';
+    } else if (!firm) return res.status(400).json({ error: 'Name the firm, or pick an account' });
+    const cat = COST_CATEGORIES.includes(c.category) ? c.category : 'other';
+    const r = await pool.query(
+      'INSERT INTO prop_costs (user_id, account_id, firm, date, category, amount, note) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+      [req.user.id, c.accountId || null, firm, c.date, cat, amt, String(c.note || '').slice(0, 200)]);
+    res.json({ success: true, id: r.rows[0].id });
+  } catch (err) { if (migrating(err, res)) return; console.error('Cost save error:', err); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/prop/costs/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM prop_costs WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) { if (migrating(err, res)) return; res.status(500).json({ error: 'Server error' }); }
+});
+
 const DD_TYPES = ['static', 'eod', 'intraday'];
 const ACCT_STATUS = ['active', 'passed', 'breached', 'closed'];
 
 app.get('/api/payouts', authMiddleware, async (req, res) => {
   try {
     const rows = (await pool.query('SELECT * FROM payouts WHERE user_id = $1 ORDER BY date DESC, id DESC', [req.user.id])).rows;
-    res.json(rows.map(r => ({ id: r.id, accountId: r.account_id, date: r.date, amount: parseFloat(r.amount), note: r.note || '' })));
+    res.json(rows.map(r => ({ id: r.id, accountId: r.account_id, date: r.date, amount: parseFloat(r.amount), note: r.note || '', firm: r.firm || '' })));
   } catch (err) {
     if (migrating(err, res)) return; console.error('API error [' + req.method + ' ' + req.path + ']:', err.message); res.status(500).json({ error: 'Server error' }); }
 });
@@ -1534,14 +1627,17 @@ app.post('/api/payouts', authMiddleware, async (req, res) => {
   try {
     const p = req.body;
     const amt = parseFloat(p.amount);
-    if (!p.accountId) return res.status(400).json({ error: 'Which account was this taken from?' });
     if (!isFinite(amt) || amt <= 0) return res.status(400).json({ error: 'Enter an amount greater than zero' });
     if (!p.date) return res.status(400).json({ error: 'Date required' });
-    const own = (await pool.query('SELECT id FROM accounts WHERE id = $1 AND user_id = $2', [p.accountId, req.user.id])).rows[0];
-    if (!own) return res.status(404).json({ error: 'Account not found' });
+    let firm = String(p.firm || '').slice(0, 80);
+    if (p.accountId) {
+      const own = (await pool.query('SELECT id, firm FROM accounts WHERE id = $1 AND user_id = $2', [p.accountId, req.user.id])).rows[0];
+      if (!own) return res.status(404).json({ error: 'Account not found' });
+      if (!firm) firm = own.firm || '';
+    } else if (!firm) return res.status(400).json({ error: 'Name the firm, or pick an account' });
     const r = await pool.query(
-      'INSERT INTO payouts (user_id, account_id, date, amount, note) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-      [req.user.id, p.accountId, p.date, amt, p.note || '']);
+      'INSERT INTO payouts (user_id, account_id, date, amount, note, firm) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+      [req.user.id, p.accountId || null, p.date, amt, p.note || '', firm]);
     res.json({ success: true, id: r.rows[0].id });
   } catch (err) {
     if (migrating(err, res)) return; console.error('Payout save error:', err); res.status(500).json({ error: 'Server error' }); }

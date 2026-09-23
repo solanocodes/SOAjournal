@@ -49,7 +49,7 @@ const OWNED_TABLES = [
   ['users', 'username'], ['trades', 'user_id'], ['daily_journals', 'user_id'],
   ['badges', 'user_id'], ['milestones', 'user_id'], ['risk_plans', 'user_id'],
   ['user_settings', 'user_id'], ['coach_messages', 'user_id'], ['coach_memory', 'user_id'],
-  ['accounts', 'user_id'], ['payouts', 'user_id'], ['mentor_notes', 'mentor_id'],
+  ['accounts', 'user_id'], ['payouts', 'user_id'], ['prop_costs', 'user_id'], ['mentor_notes', 'mentor_id'],
   ['app_state', 'key'], ['ots_cohorts', 'start_date'], ['ots_members', 'user_id'],
   ['ots_reflections', 'user_id']
 ];
@@ -216,6 +216,7 @@ const initDB = async () => {
         value TEXT
       );
 
+
       -- Mentor notes table
       CREATE TABLE IF NOT EXISTS mentor_notes (
         id SERIAL PRIMARY KEY,
@@ -308,6 +309,21 @@ const initDB = async () => {
       ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS prompt_a TEXT DEFAULT '';
       ALTER TABLE ots_reflections ADD COLUMN IF NOT EXISTS prompt_b TEXT DEFAULT '';
 
+      -- What a prop account costs to hold: evaluations, resets, activations,
+      -- data fees. Nobody tracks this side, and without it a trader cannot tell
+      -- a profitable month from an expensive one.
+      CREATE TABLE IF NOT EXISTS prop_costs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        account_id INTEGER,
+        firm VARCHAR(80) DEFAULT '',
+        date VARCHAR(20) NOT NULL,
+        category VARCHAR(30) DEFAULT 'evaluation',
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS payouts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -317,6 +333,10 @@ const initDB = async () => {
         note TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      -- Payouts can be logged against a firm before an account is set up, so the
+      -- monthly ledger never depends on finishing account configuration first.
+      ALTER TABLE payouts ADD COLUMN IF NOT EXISTS firm VARCHAR(80) DEFAULT '';
 
       -- Manual day entries: a day recorded without executions (blown account, missing export)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS manual_day BOOLEAN DEFAULT FALSE;
@@ -352,6 +372,8 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_trades_account ON trades(account_id);
       CREATE INDEX IF NOT EXISTS idx_payouts_user ON payouts(user_id);
       CREATE INDEX IF NOT EXISTS idx_payouts_account ON payouts(account_id);
+      CREATE INDEX IF NOT EXISTS idx_prop_costs_user ON prop_costs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_prop_costs_date ON prop_costs(date);
       CREATE INDEX IF NOT EXISTS idx_ots_members_user ON ots_members(user_id);
       CREATE INDEX IF NOT EXISTS idx_ots_refl_user ON ots_reflections(user_id);
       CREATE INDEX IF NOT EXISTS idx_ots_refl_date ON ots_reflections(date);

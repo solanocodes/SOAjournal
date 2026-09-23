@@ -280,6 +280,26 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .coach-fallback{margin-top:11px}
 .coach-fallback button{background:var(--accent);border:0;color:var(--bg-base);font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer}
 .coach-fallback button:hover{filter:brightness(1.08)}
+.led-nav{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.led-month{font-size:15px;font-weight:700}
+.led-hd{font-size:14px;font-weight:700;margin-bottom:12px}
+.led-hint{font-size:10.5px;color:var(--text-muted);margin-top:3px}
+.led-rows{display:flex;flex-direction:column}
+.led-row{display:grid;grid-template-columns:86px 104px 1fr auto 26px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--border);font-size:12.5px}
+.led-row.firm{grid-template-columns:1fr 110px 110px 100px 64px}
+.led-d{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.led-t{font-size:11px;font-family:var(--mono);letter-spacing:.03em;text-transform:uppercase}
+.led-t.pay{color:var(--green)}
+.led-t.cost{color:var(--text-muted)}
+.led-f{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.led-f2{font-weight:600}
+.led-s{font-family:var(--mono);font-size:11.5px;color:var(--text-muted)}
+.led-a{font-family:var(--mono);font-weight:600;text-align:right}
+.led-r{font-family:var(--mono);font-size:12px;text-align:right}
+.led-x{background:none;border:0;color:var(--text-muted);cursor:pointer;font-size:12px}
+.led-x:hover{color:var(--red)}
+.led-life{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-secondary)}
+@media(max-width:700px){.led-row,.led-row.firm{grid-template-columns:1fr auto;gap:4px}.led-d,.led-t,.led-s{grid-column:1}}
 .ots-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .ots-t{font-size:20px;font-weight:800;letter-spacing:-.01em}
 .ots-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
@@ -1343,7 +1363,7 @@ function handleForgotStep1(){const u=document.getElementById('forgotUser').value
 function handleForgotStep2(){const u=document.getElementById('forgotUser').value.trim(),a=document.getElementById('forgotAnswer').value,p=document.getElementById('forgotNewPass').value,c=document.getElementById('forgotConfirm').value,e=document.getElementById('forgotError');if(!a||!p||!c){e.textContent='Please fill in all fields';e.style.display='block';return}if(p.length<4){e.textContent='Password must be at least 4 characters';e.style.display='block';return}if(p!==c){e.textContent='Passwords do not match';e.style.display='block';return}e.style.display='none';api('POST','/api/auth/reset-password',{username:u,securityAnswer:a,newPassword:p}).then(()=>{toggleForgot();document.getElementById('loginUser').value=u;document.getElementById('loginError').style.display='none';const s=document.createElement('div');s.className='login-error';s.style.cssText='display:block;color:var(--green);border-color:var(--green)';s.textContent='Password reset! You can now sign in.';document.getElementById('loginForm').insertBefore(s,document.getElementById('loginForm').querySelector('.login-btn'));setTimeout(()=>s.remove(),4000)}).catch(err=>{e.textContent=err.message||'Reset failed';e.style.display='block'})}
 
 // ─── NAV ───
-function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'}].concat(_ots&&(_ots.enrolled||isMentor)?[{id:'ots',l:'OTS'}]:[]).concat([{id:'risk',l:'Risk Plan'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}]);if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
+function bNav(){const tabs=[{id:'dashboard',l:'Dashboard'},{id:'calendar',l:'Calendar'},{id:'trades',l:'Trade Log'},{id:'coach',l:'Delta'}].concat(_ots&&(_ots.enrolled||isMentor)?[{id:'ots',l:'OTS'}]:[]).concat([{id:'risk',l:'Risk Plan'},{id:'prop',l:'Prop Firms'},{id:'badges',l:'Badges'},{id:'reports',l:'Reports'},{id:'settings',l:'Settings'}]);if(isMentor)tabs.push({id:'mentor',l:'★ Mentor Panel'});document.getElementById('mainNav').innerHTML=tabs.map(t=>`<button class="nav-btn${curView===t.id?' active':''}" data-view="${t.id}" onclick="sv('${t.id}')">${t.l}</button>`).join('');const _x={journal:'Daily Journal',report:'Reports',recap:'Recap'};const _t=[{id:'dashboard',l:'Dashboard'}].concat(tabs).find(x=>x.id===curView)||( _x[curView]?{l:_x[curView]}:null);const _pt=document.getElementById('pageTitle');if(_pt)_pt.textContent=curView==='coach'?'Delta — Your AI Coach':(_t?_t.l.replace('★ ',''):'Dashboard');const _av=document.getElementById('sideAva');if(_av&&curUser)_av.textContent=curUser[0];refreshAcctSwitch()}
 function sv(v){curView=v;if(v!=='trades')filterDate=null;bNav();ren()}
 function refreshAcctSwitch(){const sel=document.getElementById('acctSwitch');if(!sel)return;if(!_accounts.length){sel.style.display='none';return}sel.style.display='';sel.innerHTML='<option value="">All accounts</option>'+_accounts.map(a=>`<option value="${a.id}"${curAccount===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}
 function setAccount(v){localStorage.setItem('soa_acct',v||'');applyAcctFilter();refreshAcctSwitch();ren()}
@@ -1356,7 +1376,7 @@ function viewBanners(){
   }
   return h;
 }
-function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,ots:rOts,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
+function ren(){const el=document.getElementById('mainContent');el.innerHTML='';({dashboard:rDash,calendar:rCal,trades:rTL,journal:rJournal,coach:rCoach,risk:rRisk,ots:rOts,prop:rProp,badges:rBadges,reports:rReports,report:rReport,recap:rRecap,settings:rSettings,mentor:rMentor}[curView]||rDash)(el);const _vb=viewBanners();if(_vb)el.insertAdjacentHTML('afterbegin',_vb);if(curView==='settings'&&typeof loadCoachMemory==='function')setTimeout(loadCoachMemory,0);if(curView==='mentor'&&typeof loadMentorInsights==='function'){setTimeout(loadMentorInsights,0);setTimeout(loadPlaybook,0)}}
 
 // ─── STATS ───
 function cStats(tr){const _mdCount=tr.filter(t=>t.manualDay).reduce((a,t)=>a+((parseInt(t.tradeCount)||1)-1),0);const _pt=tr.filter(t=>!t.manualDay);const tp=tr.reduce((s,t)=>s+(t.pnl||0),0),tf=tr.reduce((s,t)=>s+(t.fees||0),0);const w=_pt.filter(t=>t.pnl>0),l=_pt.filter(t=>t.pnl<0);const wr=_pt.length?w.length/_pt.length*100:0;const aw=w.length?w.reduce((s,t)=>s+t.pnl,0)/w.length:0;const al=l.length?Math.abs(l.reduce((s,t)=>s+t.pnl,0)/l.length):0;const pf=al>0&&l.length>0?(aw*w.length)/(al*l.length):(w.length>0?Infinity:0);const sk=cStreak(tr);const ar=tr.length?tr.filter(t=>t.strategy!=='No Strategy Used'&&t.strategy).length/tr.length*100:0;const avgEmo=tr.length?(tr.reduce((s,t)=>s+(t.emotionRating||5),0)/tr.length):0;const em={};tr.forEach(t=>{const r=t.emotionRating||5;const lbl=r<=3?'Low (1-3)':r<=6?'Mid (4-6)':'High (7-10)';em[lbl]=(em[lbl]||0)+1});const st={};tr.forEach(t=>{const s=t.strategy||t.setupQuality||'Unknown';st[s]=(st[s]||0)+1});const dp={};tr.forEach(t=>{const k=dKey(t.date);dp[k]=(dp[k]||0)+(t.pnl||0)});let cum=0;const cv=Object.entries(dp).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,p])=>{cum+=p;return{d,p,c:cum}});return{tp,tf,np:tp,wr,aw,al,pf,wc:w.length,lc:l.length,tot:tr.length+_mdCount,sk,ar,avgEmo,em,st,cv}}
@@ -3498,6 +3518,127 @@ function otsEnrol(){
     el.value='';msg.style.color='var(--green)';msg.textContent=d.username+' added.';
     loadOtsMentor();
   }).catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
+
+// ═══ PROP FIRM LEDGER ═══
+// What the accounts cost against what they paid out. A P&L curve never shows the
+// evaluations, resets and data fees, so a trader can be up on the charts and
+// down on the business without ever seeing it.
+let _ledger=null,_ledgerMonth=null;
+const COST_LABELS={evaluation:'Evaluation',reset:'Reset',activation:'Activation',data:'Data / platform',other:'Other'};
+function thisMonthKey(){const p=new Date();return p.getFullYear()+'-'+String(p.getMonth()+1).padStart(2,'0')}
+function monthName(k){const [y,m]=k.split('-');return new Date(Date.UTC(+y,+m-1,1)).toLocaleString('default',{month:'long',timeZone:'UTC'})+' '+y}
+function loadLedger(){
+  const m=_ledgerMonth||thisMonthKey();
+  return api('GET','/api/prop/ledger?month='+m).then(d=>{_ledger=d;_ledgerMonth=d.month}).catch(e=>{_ledger=null;console.error(e)});
+}
+function propMonth(dir){
+  const [y,m]=(_ledgerMonth||thisMonthKey()).split('-').map(Number);
+  const d=new Date(Date.UTC(y,m-1+dir,1));
+  _ledgerMonth=d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+  loadLedger().then(ren);
+}
+
+function rProp(el){
+  if(!_ledger){el.innerHTML='<div class="empty-state fade-up"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading…</h3></div>';loadLedger().then(ren);return}
+  const L=_ledger;
+  const roiTxt=L.roi===null?'—':(L.roi>=0?'+':'')+L.roi.toFixed(1)+'%';
+  const roiCol=L.roi===null?'var(--text-muted)':L.roi>=0?'var(--green)':'var(--red)';
+
+  let h='<h2 style="font-size:20px;font-weight:800;margin-bottom:6px">Prop Firms</h2>'+
+    '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:18px;max-width:620px;line-height:1.6">'+
+    'What the accounts cost against what they paid out. Your trading P&L does not include evaluations, resets or data fees &mdash; this does.</div>';
+
+  h+='<div class="led-nav"><button class="cal-nav-btn" onclick="propMonth(-1)">◀</button>'+
+     '<span class="led-month">'+monthName(L.month)+'</span>'+
+     '<button class="cal-nav-btn" onclick="propMonth(1)">▶</button></div>';
+
+  h+='<div class="stats-grid" style="margin-bottom:18px">'+
+    '<div class="stat-card"><div class="stat-label">Spent</div><div class="stat-value" style="font-size:22px;color:'+(L.spent?'var(--red)':'var(--text-primary)')+'">'+f$(L.spent)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Payouts</div><div class="stat-value" style="font-size:22px;color:'+(L.paid?'var(--green)':'var(--text-primary)')+'">'+f$(L.paid)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Net</div><div class="stat-value" style="font-size:22px;color:'+(L.net>=0?'var(--green)':'var(--red)')+'">'+f$(L.net)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" style="font-size:22px;color:'+roiCol+'">'+roiTxt+'</div>'+
+    (L.roi===null?'<div class="led-hint">nothing spent yet</div>':'')+'</div>'+
+    '</div>';
+
+  // Log a cost
+  h+='<div class="card" style="margin-bottom:16px"><div class="led-hd">Log what you spent</div>'+
+    '<div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">'+
+    '<div class="field"><label>Date</label><input type="date" id="pcDate" value="'+esc(etToday())+'"></div>'+
+    '<div class="field"><label>What for</label><select id="pcCat">'+
+      Object.entries(COST_LABELS).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select></div>'+
+    '<div class="field"><label>Firm</label><input id="pcFirm" list="firmList" placeholder="Take Profit Trader"></div>'+
+    '<div class="field"><label>Amount $</label><input type="number" step="0.01" id="pcAmt" placeholder="165"></div>'+
+    '<div class="field"><label>Note <span class="fh">optional</span></label><input id="pcNote" placeholder="50k reset"></div>'+
+    '</div>'+
+    '<datalist id="firmList">'+FIRM_PRESETS.map(f=>'<option value="'+esc(f.name)+'">').join('')+'</datalist>'+
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">'+
+    '<button class="btn-primary" onclick="addCost()">Add cost</button>'+
+    '<button class="btn-sm" onclick="addPayoutLedger()">Log a payout</button>'+
+    '<span id="pcMsg" style="font-size:12px;color:var(--text-muted)"></span></div></div>';
+
+  // The month's entries
+  const rows=[].concat(
+    L.costs.map(c=>({t:'cost',date:c.date,label:COST_LABELS[c.category]||'Other',firm:c.firm,amt:-c.amount,note:c.note,id:c.id})),
+    L.payouts.map(p=>({t:'pay',date:p.date,label:'Payout',firm:p.firm,amt:p.amount,note:p.note,id:p.id}))
+  ).sort((a,b)=>b.date.localeCompare(a.date));
+  h+='<div class="card" style="margin-bottom:16px"><div class="led-hd">'+monthName(L.month)+' &mdash; '+rows.length+' entr'+(rows.length===1?'y':'ies')+'</div>';
+  if(!rows.length)h+='<div style="font-size:12.5px;color:var(--text-muted)">Nothing logged this month.</div>';
+  else h+='<div class="led-rows">'+rows.map(r=>
+    '<div class="led-row"><span class="led-d">'+fD(r.date)+'</span>'+
+    '<span class="led-t '+(r.t==='pay'?'pay':'cost')+'">'+esc(r.label)+'</span>'+
+    '<span class="led-f">'+esc(r.firm||'—')+(r.note?' · '+esc(r.note):'')+'</span>'+
+    '<span class="led-a" style="color:'+(r.amt>=0?'var(--green)':'var(--red)')+'">'+(r.amt>=0?'+':'')+f$(r.amt)+'</span>'+
+    '<button class="led-x" title="Remove" onclick="delLedger(\''+r.t+'\','+r.id+')">✕</button></div>').join('')+'</div>';
+  h+='</div>';
+
+  // Which firms have actually paid for themselves, across everything.
+  if(L.byFirm.length){
+    h+='<div class="card" style="margin-bottom:16px"><div class="led-hd">By firm &mdash; all time</div><div class="led-rows">'+
+      L.byFirm.map(f=>'<div class="led-row firm"><span class="led-f2">'+esc(f.firm)+'</span>'+
+        '<span class="led-s">spent '+f$(f.spent)+'</span>'+
+        '<span class="led-s">paid '+f$(f.paid)+'</span>'+
+        '<span class="led-a" style="color:'+(f.net>=0?'var(--green)':'var(--red)')+'">'+f$(f.net)+'</span>'+
+        '<span class="led-r" style="color:'+(f.roi===null?'var(--text-muted)':f.roi>=0?'var(--green)':'var(--red)')+'">'+
+          (f.roi===null?'—':(f.roi>=0?'+':'')+f.roi.toFixed(0)+'%')+'</span></div>').join('')+'</div>';
+    const lt=L.lifetime;
+    h+='<div class="led-life">All time: spent <strong>'+f$(lt.spent)+'</strong> · paid <strong>'+f$(lt.paid)+'</strong> · '+
+       'net <strong style="color:'+(lt.net>=0?'var(--green)':'var(--red)')+'">'+f$(lt.net)+'</strong>'+
+       (lt.roi===null?'':' · ROI <strong style="color:'+(lt.roi>=0?'var(--green)':'var(--red)')+'">'+(lt.roi>=0?'+':'')+lt.roi.toFixed(1)+'%</strong>')+'</div></div>';
+  }
+  el.innerHTML=h;
+}
+
+function addCost(){
+  const msg=document.getElementById('pcMsg');
+  const body={date:document.getElementById('pcDate').value,category:document.getElementById('pcCat').value,
+    firm:document.getElementById('pcFirm').value.trim(),amount:parseFloat(document.getElementById('pcAmt').value),
+    note:document.getElementById('pcNote').value.trim()};
+  if(!body.firm){msg.style.color='var(--red)';msg.textContent='Which firm?';return}
+  if(!(body.amount>0)){msg.style.color='var(--red)';msg.textContent='Enter an amount';return}
+  msg.style.color='var(--text-muted)';msg.textContent='Saving...';
+  // Jump to the month the entry belongs to, so it is visible after saving.
+  const m=String(body.date).slice(0,7);
+  api('POST','/api/prop/costs',body).then(()=>{_ledgerMonth=m;return loadLedger()}).then(ren)
+    .catch(e=>{msg.style.color='var(--red)';msg.textContent=e.message});
+}
+function addPayoutLedger(){
+  const amt=prompt('How much was the payout?');if(amt===null)return;
+  const v=parseFloat(String(amt).replace(/[^0-9.\-]/g,''));
+  if(!(v>0)){alert('Enter an amount greater than zero.');return}
+  const firm=prompt('Which firm?',document.getElementById('pcFirm').value.trim()||'');
+  if(firm===null||!firm.trim()){alert('Name the firm.');return}
+  const d=prompt('Date (YYYY-MM-DD)',document.getElementById('pcDate').value||etToday());
+  if(d===null)return;
+  const date=normalizeDate(d)||d;
+  api('POST','/api/payouts',{date,amount:v,firm:firm.trim()})
+    .then(()=>{_ledgerMonth=String(date).slice(0,7);return loadLedger()}).then(ren)
+    .catch(e=>alert(e.message));
+}
+function delLedger(kind,id){
+  if(!confirm('Remove this entry?'))return;
+  api('DELETE',kind==='pay'?'/api/payouts/'+id:'/api/prop/costs/'+id)
+    .then(()=>loadLedger()).then(ren).catch(e=>alert(e.message));
 }
 
 // ─── PROP FIRMS ───
