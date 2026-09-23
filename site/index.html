@@ -299,6 +299,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .ots-cell.ok{background:rgba(111,176,131,.35);border-color:rgba(111,176,131,.5);color:var(--text-primary)}
 .ots-cell.late{background:rgba(212,175,90,.28);border-color:rgba(212,175,90,.5);color:var(--text-primary)}
 .ots-cell.miss{background:rgba(220,80,80,.16);border-color:rgba(220,80,80,.34)}
+.ots-cell.off{background:transparent;border-style:dashed;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.22)}
+.ots-mini.off{background:rgba(255,255,255,.06)}
 .ots-cell.now{border-color:var(--accent);color:var(--accent);font-weight:700}
 .ots-cell.sel{outline:2px solid var(--text-primary);outline-offset:1px}
 .ots-cell.anchor{box-shadow:inset 0 0 0 1px var(--accent)}
@@ -3104,6 +3106,12 @@ const OTS_KINDS={
   daily:{title:null,lead:null,
     learned:{l:'What did I learn today?',p:'The thing you know now that you didn’t this morning.'},
     bringing:{l:'What am I bringing into tomorrow?',p:'One thing. You’ll be asked about it tomorrow.'}},
+  weekend:{title:'Weekend',optional:true,
+    lead:'Optional. Markets are shut — this one is about the week, not the day.',
+    sat:{learned:{l:'What did this week actually teach me?',p:'Look at the five days together, not at any one trade.'},
+         bringing:{l:'What am I leaving behind in this week?',p:'The habit you are not carrying into Monday.'}},
+    sun:{learned:{l:'What kind of shape am I in for Monday?',p:'Rest, headspace, life outside the screen — all of it shows up at the open.'},
+         bringing:{l:'What is the one rule I will not break this week?',p:'Decide it now, while nothing is moving.'}}},
   // Checkpoints at the thirds. The window is the stretch since the last anchor,
   // so on a 90-day sprint both read "the last 30 days".
   milestone:{title:'Milestone',lead:(n,w,d)=>d+' days in. Look back at the '+w+' days you just finished, not at today.',
@@ -3117,9 +3125,11 @@ const OTS_KINDS={
 };
 // What to label a stored answer with: the question it was actually asked,
 // falling back to the rotation for rows written before prompts were recorded.
-function otsPromptsFor(r,total){
+function otsPromptsFor(r,total,startDate){
   const kind=r.kind||'daily';
-  const base=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(r.dayNum||2)):OTS_KINDS[kind];
+  const base=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(r.dayNum||2))
+           :kind==='weekend'&&startDate?otsWeekendSet(startDate,r.dayNum||2)
+           :OTS_KINDS[kind]||OTS_KINDS.daily;
   const T=total||90,W=otsWindow(r.dayNum||2,T);
   const tx=v=>typeof v==='function'?v(T,W,r.dayNum||2):v;
   return{a:r.promptA||tx(base.learned.l),b:r.promptB||tx(base.bringing.l),
@@ -3131,10 +3141,20 @@ function otsMilestonesOf(total){
   if(b>1&&b<total&&b!==a)out.push(b);
   return out;
 }
-function otsKindOf(day,total){
+function otsIsWeekendDate(iso){const d=new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))).getUTCDay();return d===0||d===6}
+function otsKindOf(day,total,startDate){
   if(day===1)return'intake';
   if(day===total)return'completion';
-  return otsMilestonesOf(total).includes(day)?'milestone':'daily';
+  if(otsMilestonesOf(total).includes(day))return'milestone';
+  if(startDate&&otsIsWeekendDate(otsAdd(startDate,day-1)))return'weekend';
+  return'daily';
+}
+// Saturday and Sunday ask different things, so resolve which before rendering.
+function otsWeekendSet(startDate,day){
+  const iso=otsAdd(startDate,day-1);
+  const dow=new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))).getUTCDay();
+  const W=OTS_KINDS.weekend;
+  return Object.assign({},W,dow===6?W.sat:W.sun);
 }
 // The anchor a checkpoint is measured from: the previous milestone, or the start.
 function otsWindow(day,total){
@@ -3176,21 +3196,27 @@ function rOts(el){
   const day=_otsDay||c.currentDay;
   const date=otsAdd(c.startDate,day-1);
   const cur=byDate[date]||null;
-  const prev=day>1?byDate[otsAdd(c.startDate,day-2)]:null;
+  let prev=null;
+  for(let b=day-1;b>=1;b--){const r=byDate[otsAdd(c.startDate,b-1)];if(r&&r.bringing){prev=r;break}}
   const done=(_ots.reflections||[]).length;
   // Only days that have already passed can be missed — today is still open.
   let missed=0;
-  for(let d=1;d<c.currentDay;d++)if(!byDate[otsAdd(c.startDate,d-1)])missed++;
+  for(let d=1;d<c.currentDay;d++){
+    const dt=otsAdd(c.startDate,d-1);
+    if(!byDate[dt]&&!otsIsWeekendDate(dt))missed++;   // weekends are optional
+  }
 
   h+='<div class="ots-prog fade-up"><div class="ots-prog-top"><span>Day <strong>'+c.currentDay+'</strong> of '+c.totalDays+'</span>'+
      '<span>'+done+' reflection'+(done!==1?'s':'')+' written'+(missed?' · '+missed+' missed':'')+
-     (byDate[otsAdd(c.startDate,c.currentDay-1)]?'':' · today still open')+'</span></div>'+
+     (byDate[otsAdd(c.startDate,c.currentDay-1)]?'':(otsIsWeekendDate(c.today)?' · weekend, optional':' · today still open'))+'</span></div>'+
      '<div class="ots-bar"><div class="ots-bar-f" style="width:'+(c.currentDay/c.totalDays*100).toFixed(1)+'%"></div></div>';
   h+='<div class="ots-grid">';
   for(let d=1;d<=c.totalDays;d++){
     const dt=otsAdd(c.startDate,d-1);
-    const st=byDate[dt]?(byDate[dt].late?'late':'ok'):(d<c.currentDay?'miss':(d===c.currentDay?'now':'soon'));
-    const k=otsKindOf(d,c.totalDays);
+    const wknd=otsIsWeekendDate(dt);
+    const st=byDate[dt]?(byDate[dt].late?'late':'ok')
+           :(d===c.currentDay?'now':(d<c.currentDay?(wknd?'off':'miss'):'soon'));
+    const k=otsKindOf(d,c.totalDays,c.startDate);
     const mark=k==='daily'?'':' anchor';
     const tip=k==='daily'?'':' · '+OTS_KINDS[k].title;
     h+='<button class="ots-cell '+st+mark+(d===day?' sel':'')+'" title="Day '+d+' · '+fD(dt)+tip+'" onclick="otsGo('+d+')">'+d+'</button>';
@@ -3199,22 +3225,26 @@ function rOts(el){
 
   // Yesterday's commitment leads, so the first thing you read is your own promise.
   if(prev&&prev.bringing){
+    const gapDays=day-1-prev.dayNum;
     h+='<div class="ots-carry fade-up"><div class="ots-carry-l">'+
-       (day===2?'The goals you set on day 1':'What you said you’d bring into today')+'</div>'+
+       (prev.dayNum===1?'The goals you set on day 1'
+        :gapDays>0?'What you said you’d bring in, on day '+prev.dayNum
+        :'What you said you’d bring into today')+'</div>'+
        '<div class="ots-carry-q">'+esc(prev.bringing)+'</div>'+
        '<div class="ots-carry-a"><span>Did you?</span>'+
        '<button class="ots-yn'+(cur&&cur.keptPrior===true?' yes':'')+'" onclick="otsKept(true)">Yes</button>'+
        '<button class="ots-yn'+(cur&&cur.keptPrior===false?' no':'')+'" onclick="otsKept(false)">Not really</button></div></div>';
   }
 
-  const kind=otsKindOf(day,c.totalDays);
-  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day)):OTS_KINDS[kind];
+  const kind=otsKindOf(day,c.totalDays,c.startDate);
+  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day))
+        :kind==='weekend'?otsWeekendSet(c.startDate,day):OTS_KINDS[kind];
   // On the last day, day one's baseline sits above the form to answer against.
   if(kind==='completion'||kind==='milestone'){
     const anchorDay=kind==='completion'?1:otsPrevAnchorDay(day,c.totalDays);
     const anchor=byDate[otsAdd(c.startDate,anchorDay-1)];
     if(anchor){
-      const A=otsPromptsFor(anchor,c.totalDays);
+      const A=otsPromptsFor(anchor,c.totalDays,c.startDate);
       h+='<div class="ots-baseline fade-up"><div class="ots-carry-l">What you wrote on day '+anchorDay+'</div>'+
         (anchor.learned?'<div class="ots-bl"><em>'+esc(A.a)+'</em> '+esc(anchor.learned)+'</div>':'')+
         (anchor.extra&&A.c?'<div class="ots-bl"><em>'+esc(A.c)+'</em> '+esc(anchor.extra)+'</div>':'')+
@@ -3246,7 +3276,7 @@ function rOts(el){
     past.forEach(r=>{h+='<div class="ots-past"><div class="ots-past-hd">Day '+r.dayNum+' · '+fD(r.date)+
       (r.late?' <span class="ots-late-tag">late</span>':'')+
       (r.keptPrior===true?' <span class="ots-kept">kept</span>':r.keptPrior===false?' <span class="ots-broke">missed</span>':'')+'</div>'+
-      (()=>{const K=otsPromptsFor(r,c.totalDays);
+      (()=>{const K=otsPromptsFor(r,c.totalDays,c.startDate);
         return (r.learned?'<div class="ots-past-l"><em>'+esc(K.a)+'</em> '+esc(r.learned)+'</div>':'')+
           (r.extra&&K.c?'<div class="ots-past-l"><em>'+esc(K.c)+'</em> '+esc(r.extra)+'</div>':'')+
           (r.bringing?'<div class="ots-past-l"><em>'+esc(K.b)+'</em> '+esc(r.bringing)+'</div>':'')})()+'</div>'});
@@ -3267,8 +3297,9 @@ function saveOts(day){
   if(!learned&&!bringing&&!extra){msg.style.color='var(--red)';msg.textContent='Write something in at least one field';return}
   msg.style.color='var(--text-muted)';msg.textContent='Saving...';
   const date=otsAdd(_ots.cohort.startDate,day-1);
-  const kind=otsKindOf(day,_ots.cohort.totalDays);
-  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day)):OTS_KINDS[kind];
+  const kind=otsKindOf(day,_ots.cohort.totalDays,_ots.cohort.startDate);
+  const K=kind==='daily'?Object.assign({},OTS_KINDS.daily,otsDailyPrompts(day))
+        :kind==='weekend'?otsWeekendSet(_ots.cohort.startDate,day):OTS_KINDS[kind];
   const T=_ots.cohort.totalDays,W=otsWindow(day,T),tx=v=>typeof v==='function'?v(T,W,day):v;
   const body={date,learned,bringing,extra,promptA:tx(K.learned.l),promptB:tx(K.bringing.l)};
   if(_otsKept!==null)body.keptPrior=_otsKept;
@@ -3323,12 +3354,17 @@ function otsCohortHTML(){
     const set=new Set(m.days||[]);
     const upTo=c.currentDay||0;
     let missed=0;
-    for(let d=1;d<upTo;d++)if(!set.has(d))missed++;   // today is not missed yet
+    for(let d=1;d<upTo;d++){
+      if(set.has(d))continue;
+      if(otsIsWeekendDate(otsAdd(c.startDate,d-1)))continue;   // weekends are optional
+      missed++;
+    }
     const todayDone=upTo>0&&set.has(upTo);
     let cells='';
     for(let d=1;d<=c.totalDays;d++){
-      const st=set.has(d)?'ok':(d<=upTo?'miss':'soon');
-      cells+='<span class="ots-mini '+st+'" title="Day '+d+'"></span>';
+      const wknd=otsIsWeekendDate(otsAdd(c.startDate,d-1));
+      const st=set.has(d)?'ok':(d<=upTo?(wknd?'off':'miss'):'soon');
+      cells+='<span class="ots-mini '+st+'" title="Day '+d+(wknd?' · weekend':'')+'"></span>';
     }
     h+='<div class="ots-row'+(_otsStudent===m.id?' active':'')+'" onclick="otsPick('+m.id+')">'+
       '<div class="ots-row-hd"><span class="ots-row-n">'+esc(m.fullName)+
@@ -3359,12 +3395,19 @@ function otsDetailHTML(){
   const written=d.rows.filter(r=>r.reflection).length;
   const late=d.rows.filter(r=>r.reflection&&r.reflection.late).length;
   const upTo=c.currentDay||0;
-  let missed=0;for(const r of d.rows)if(!r.reflection&&r.dayNum<upTo)missed++;
+  let missed=0;
+  for(const r of d.rows)if(!r.reflection&&r.dayNum<upTo&&!otsIsWeekendDate(r.date))missed++;
+  const weekendsWritten=d.rows.filter(r=>r.reflection&&otsIsWeekendDate(r.date)).length;
   const kept=d.rows.filter(r=>r.reflection&&r.reflection.keptPrior===true).length;
   const broke=d.rows.filter(r=>r.reflection&&r.reflection.keptPrior===false).length;
   // Consecutive days written, counting back from the most recent elapsed day.
   let streak=0;
-  for(const r of d.rows){if(r.dayNum>upTo)continue;if(r.reflection)streak++;else break}
+  for(const r of d.rows){
+    if(r.dayNum>upTo)continue;
+    if(r.reflection){streak++;continue}
+    if(otsIsWeekendDate(r.date))continue;   // an optional day never breaks it
+    break;
+  }
   const st=(l,v,col)=>'<div class="stat-card"><div class="stat-label">'+l+'</div><div class="stat-value" style="font-size:20px'+(col?';color:'+col:'')+'">'+v+'</div></div>';
   h+='<div class="ots-stat-hd">Sprint</div><div class="stats-grid" style="margin-bottom:18px">'+
      st('Days written',written+' / '+upTo)+
@@ -3372,6 +3415,7 @@ function otsDetailHTML(){
      st('Current streak',streak+'d')+
      st('Written late',late,late?'var(--yellow)':'var(--text-primary)')+
      (kept+broke?st('Kept their word',kept+' / '+(kept+broke),broke?'var(--yellow)':'var(--green)'):'')+
+     (weekendsWritten?st('Weekends written',weekendsWritten,'var(--accent)'):'')+
      '</div>';
 
   // The same trading picture the Mentor Panel shows, from the same feed.
@@ -3394,20 +3438,21 @@ function otsDetailHTML(){
   h+='<div class="ots-sbs">';
   d.rows.forEach(r=>{
     const t=r.trading,rf=r.reflection;
-    const gap=!rf&&!!t;
+    const wknd=otsIsWeekendDate(r.date);
+    const gap=!rf&&!!t&&!wknd;
     h+='<div class="sbs-row'+(rf||t?'':' empty')+(gap?' gap':'')+'">'+
       '<div class="sbs-day"><span class="sbs-d">Day '+r.dayNum+'</span><span class="sbs-dt">'+fD(r.date)+'</span>'+
       (rf&&rf.late?'<span class="ots-late-tag">late</span>':'')+
       (rf&&rf.keptPrior===true?'<span class="ots-kept">kept</span>':rf&&rf.keptPrior===false?'<span class="ots-broke">missed</span>':'')+'</div>'+
       '<div class="sbs-refl">'+(rf
         ? (()=>{const T=(d.cohort&&d.cohort.totalDays)||90;
-            const K=otsPromptsFor(rf,T),tag=OTS_KINDS[rf.kind||'daily'];
+            const K=otsPromptsFor(rf,T,d.cohort&&d.cohort.startDate),tag=OTS_KINDS[rf.kind||'daily'];
             return (tag&&tag.title?'<div class="ots-kind-tag sm">'+tag.title+'</div>':'')+
               (rf.learned?'<div class="sbs-l"><em>'+esc(K.a)+'</em> '+esc(rf.learned)+'</div>':'')+
               (rf.extra&&K.c?'<div class="sbs-l"><em>'+esc(K.c)+'</em> '+esc(rf.extra)+'</div>':'')+
               (rf.bringing?'<div class="sbs-l"><em>'+esc(K.b)+'</em> '+esc(rf.bringing)+'</div>':'')})()
         : gap?'<div class="sbs-gap">Traded, didn’t write it up</div>'
-             :'<div class="sbs-none">No reflection</div>')+'</div>'+
+             :'<div class="sbs-none">'+(wknd?'Weekend — optional':'No reflection')+'</div>')+'</div>'+
       '<div class="sbs-trade">'+(t
         ? '<div class="sbs-pnl" style="color:'+(t.pnl>=0?'var(--green)':'var(--red)')+'">'+f$(t.pnl)+'</div>'+
           '<div class="sbs-meta">'+t.trades+' trade'+(t.trades!==1?'s':'')+' · emotion '+t.avgEmotion+'/10 · '+t.avgRules+'/8 rules'+
