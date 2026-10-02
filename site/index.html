@@ -4592,7 +4592,10 @@ function renderImportPreview(rts,fileCount,problems){
   rts.forEach(t=>{const key=t.brokerAccount||'';const nm=acctNameForBroker(key);const label=nm||key||'Unassigned';
     if(!groups[label])groups[label]={n:0,p:0,matched:!!nm};groups[label].n++;groups[label].p+=t.pnl||0});
   const gkeys=Object.keys(groups);
-  let h=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length!==1?'s':''} from ${fileCount} file${fileCount!==1?'s':''}</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div>`;
+  const _ix=impExistingIndex();
+  const _dupes=rts.filter(t=>impIsDuplicate(_ix,t,impAcctKey(impAcctId(t),t.brokerAccount))).length;
+  const _fresh=rts.length-_dupes;
+  let h=`<div class="import-preview"><div class="import-preview-header"><span class="import-preview-count">${rts.length} trade${rts.length!==1?'s':''} from ${fileCount} file${fileCount!==1?'s':''}${_dupes?` · <strong style="color:var(--yellow)">${_dupes} already in your journal</strong>`:''}</span><span style="font-family:var(--mono);font-size:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="color:var(--text-muted)">Gross: <strong style="color:${totalGross>=0?'var(--green)':'var(--red)'}">${f$(totalGross)}</strong></span><span style="color:var(--text-muted)">Fees: <strong style="color:var(--red)">${f$(totalFees)}</strong></span><span style="color:var(--text-muted)">Net: <strong style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${f$(totalPnl)}</strong></span></span></div>`;
   if(gkeys.length>1||gkeys.some(k=>groups[k].matched)){
     h+='<div class="imp-accts">'+gkeys.map(label=>{const g=groups[label];
       return`<div class="imp-acct${g.matched?' ok':''}"><span class="imp-acct-nm">${g.matched?'✓ ':''}${esc(label)}</span><span class="imp-acct-meta">${g.n} trade${g.n!==1?'s':''} · <strong style="color:${g.p>=0?'var(--green)':'var(--red)'}">${f$(g.p)}</strong></span></div>`}).join('')+'</div>';
@@ -4616,7 +4619,7 @@ function renderImportPreview(rts,fileCount,problems){
   if(rts.length>40)h+=`<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">+${rts.length-40} more</td></tr>`;
   h+='</tbody></table></div></div>';
   document.getElementById('importPreview').innerHTML=h;
-  status.innerHTML=`<div class="import-status success">✓ ${rts.length} trade${rts.length!==1?"s":""} ready — click Review to tag each one</div>`+(problems.length?`<div class="import-status error" style="margin-top:8px">Skipped: ${problems.map(esc).join(' · ')}</div>`:'');
+  status.innerHTML=`<div class="import-status success">✓ ${_fresh} trade${_fresh!==1?"s":""} ready — click Review to tag each one${_dupes?` · ${_dupes} skipped as already imported`:''}</div>`+(problems.length?`<div class="import-status error" style="margin-top:8px">Skipped: ${problems.map(esc).join(' · ')}</div>`:'');
   document.getElementById('btnImportConfirm').style.display='inline-block';
 }
 async function handleImportFiles(fileList){
@@ -4652,12 +4655,57 @@ async function handleImportFiles(fileList){
 }
 function handleImportFile(file){return handleImportFiles(file?[file]:[])}
 
+// ─── IMPORT DEDUPE ───
+// The same setup taken on two prop accounts produces two near-identical rows.
+// They are separate trades with separate P&L, not a file imported twice — so the
+// account has to be part of what makes a trade unique. Where a broker account is
+// not mapped to a journal account yet, its raw label from the CSV stands in,
+// which is what tells TPT3 apart from TPT.
+function impAcctId(rt){
+  const m=(_accounts||[]).find(a=>rt.brokerAccount&&(a.brokerIds||'').split(',').map(x=>x.trim()).filter(Boolean).some(bid=>String(rt.brokerAccount).includes(bid)));
+  return m?m.id:(curAccount||null);
+}
+function impAcctKey(acctId,brokerAccount){
+  if(acctId!=null)return 'a'+acctId;
+  const b=String(brokerAccount||'').trim();
+  return b?'b'+b:'';
+}
+function impBaseSig(d,tk,dir,ep,xp,q,p){
+  return [(dKey(d)||d),tk,dir,ep,xp,String(q||1),Math.round(p||0)].join('|');
+}
+// Existing trades grouped by what they are, each holding the account keys seen.
+function impExistingIndex(){
+  const ix=new Map();
+  (_allTrades||[]).forEach(t=>{
+    const k=impBaseSig(t.date,t.ticker,t.direction,t.entryPrice,t.exitPrice,t.quantity,t.pnl);
+    (ix.get(k)||ix.set(k,[]).get(k)).push(impAcctKey(t.accountId,t.brokerAccount));
+  });
+  return ix;
+}
+// A candidate is a duplicate of one already stored only if an existing trade
+// matches it AND came from the same account — or predates broker labels being
+// recorded at all, in which case its account is unknown and it still counts.
+function impIsDuplicate(ix,rt,acctKey){
+  const list=ix.get(impBaseSig(rt.date,rt.product,rt.direction,rt.entryPrice,rt.exitPrice,rt.quantity,rt.pnl));
+  if(!list||!list.length)return false;
+  let i=list.indexOf(acctKey);
+  if(i<0)i=list.indexOf('');
+  if(i<0)return false;
+  list.splice(i,1);
+  return true;
+}
+
 // ─── REVIEW SLIDESHOW ───
 function startReview(){if(!pendingImports.length)return;
-// Filter out duplicates BEFORE review so user doesn't waste time reviewing them
-const existing=new Set(_allTrades.map(t=>dKey(t.date)+'|'+t.ticker+'|'+t.direction+'|'+t.entryPrice+'|'+t.exitPrice+'|'+(t.quantity||1)+'|'+Math.round(t.pnl||0)));
+// Drop what is genuinely already stored before review, so nobody tags a trade
+// that will not be saved. Same rule finishImport uses — these two disagreeing is
+// what silently destroyed copy trades across accounts.
+const ix=impExistingIndex();
 let dupCount=0;
-reviewData=pendingImports.filter(rt=>{const sig=rt.date+'|'+rt.product+'|'+rt.direction+'|'+rt.entryPrice+'|'+rt.exitPrice+'|'+(rt.quantity||1)+'|'+Math.round(rt.pnl||0);if(existing.has(sig)){dupCount++;return false}return true});
+reviewData=pendingImports.filter(rt=>{
+  if(impIsDuplicate(ix,rt,impAcctKey(impAcctId(rt),rt.brokerAccount))){dupCount++;return false}
+  return true;
+});
 if(!reviewData.length){document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">⚠️</div><h3 class="empty-title">All ${dupCount} trade${dupCount!==1?'s':''} are duplicates</h3><p class="empty-text">These trades are already in your journal. No new trades to import.</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport()">Done</button>`;return}
 if(dupCount>0){const status=document.getElementById('importStatus');if(status)status.innerHTML=`<div class="import-status" style="background:rgba(234,179,8,0.1);color:var(--yellow);border-color:var(--yellow)">⚠️ ${dupCount} duplicate${dupCount!==1?'s':''} already in your journal — skipped. Reviewing ${reviewData.length} new trade${reviewData.length!==1?'s':''}.</div>`}
 reviewIndex=0;showReviewSlide()}
@@ -4759,7 +4807,7 @@ function removeReviewScreenshot(tradeIdx,imgIdx){
 function checkStorageUsage(){return 0;}
 
 function saveCurrentReview(){const t=reviewData[reviewIndex];const emo=document.getElementById('rv-emo');if(emo)t.emotionRating=parseInt(emo.value);const notes=document.getElementById('rv-notes');if(notes)t.notes=notes.value}
-function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const impSig=(d,tk,dir,ep,xp,q,p,acct)=>[(dKey(d)||d),tk,dir,ep,xp,String(q||1),Math.round(p||0),acct==null?'':acct].join('|');const impAcct=rt=>{const m=_accounts.find(a=>rt.brokerAccount&&(a.brokerIds||'').split(',').map(x=>x.trim()).filter(Boolean).some(bid=>String(rt.brokerAccount).includes(bid)));return m?m.id:(curAccount||null)};const counts=new Map();_allTrades.forEach(t=>{const k=impSig(t.date,t.ticker,t.direction,t.entryPrice,t.exitPrice,t.quantity,t.pnl,t.accountId);counts.set(k,(counts.get(k)||0)+1)});reviewData.forEach(rt=>{const _acct=impAcct(rt);const sig=impSig(rt.date,rt.product,rt.direction,rt.entryPrice,rt.exitPrice,rt.quantity,rt.pnl,_acct);const _c=counts.get(sig)||0;if(_c>0){counts.set(sig,_c-1);skipped++;return}_allTrades.push({id:gId(),accountId:_acct,date:normalizeDate(rt.date)||rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv'});imported++});trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;api('POST','/api/trades/bulk',{trades:_allTrades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>Same trade, same account, already logged.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
+function finishImport(){let imported=0,skipped=0;const broker=document.getElementById('importBroker')?document.getElementById('importBroker').value:'';const ix=impExistingIndex();reviewData.forEach(rt=>{const _acct=impAcctId(rt);if(impIsDuplicate(ix,rt,impAcctKey(_acct,rt.brokerAccount))){skipped++;return}_allTrades.push({id:gId(),accountId:_acct,date:normalizeDate(rt.date)||rt.date,instrument:rt.instrument||(FT.includes(rt.product)||TICK_VALUES[rt.product]?'futures':'options'),ticker:rt.product,direction:rt.direction,entryPrice:rt.entryPrice,exitPrice:rt.exitPrice,quantity:String(rt.quantity),stopLoss:'',pnl:rt.pnl,fees:rt.fees||0,grossPnl:rt.grossPnl||rt.pnl,strategy:(rt.strategies&&rt.strategies.length?rt.strategies.join(' + '):'No Strategy Used'),emotionRating:rt.emotionRating||7,rulesFollowed:rt.rulesFollowed||[],notes:rt.notes||'Imported — '+rt.contract,screenshots:rt.screenshots||[],importedFrom:broker||'csv',brokerAccount:rt.brokerAccount||''});imported++});trades=curAccount?_allTrades.filter(t=>t.accountId===curAccount):_allTrades;api('POST','/api/trades/bulk',{trades:_allTrades.slice(-imported)}).catch(err=>console.error(err));chkBdg();chkMilestones();document.getElementById('importBody').innerHTML=`<div class="empty-state fade-up"><div class="empty-icon">${skipped>0?'⚠️':'✅'}</div><h3 class="empty-title">${imported} trade${imported!==1?'s':''} imported!</h3><p class="empty-text">${skipped>0?'<strong style="color:var(--yellow)">'+skipped+' duplicate'+(skipped!==1?'s':'')+' detected and skipped</strong><br>Same trade, same account, already logged.':'All trades tagged with strategy, emotions & rules'}</p></div>`;document.getElementById('importFooter').innerHTML=`<button class="btn-primary" onclick="closeImport();ren()">Done</button>`;pendingImports=[];reviewData=[]}
 
 // ─── TRADE MODAL ───
 function openModal(tr){editId=tr?tr.id:null;const _mdEl=document.getElementById('f-manualday');if(_mdEl)_mdEl.checked=!!(tr&&tr.manualDay);const _mdcEl=document.getElementById('f-mdcount');if(_mdcEl)_mdcEl.value=(tr&&tr.tradeCount)||'';document.getElementById('modalTitle').textContent=tr?'Edit Trade':'Log New Trade';document.getElementById('btnSave').textContent=tr?'Update Trade':'Log Trade';document.getElementById('f-date').value=tr?tr.date:new Date().toISOString().slice(0,10);document.getElementById('f-instrument').value=tr?tr.instrument:'options';updateTickers();if(tr)document.getElementById('f-ticker').value=tr.ticker;fDir=tr?tr.direction:'Long';updDir();document.getElementById('f-entry').value=tr?tr.entryPrice:'';document.getElementById('f-exit').value=tr?tr.exitPrice:'';document.getElementById('f-qty').value=tr?tr.quantity:'1';document.getElementById('f-sl').value=tr?tr.stopLoss:'';document.getElementById('f-pnl').value=tr?tr.pnl:'';document.getElementById('f-fees').value=tr?tr.fees:'0';fSetup=tr?(tr.strategy||'').split(' + ').filter(s=>s&&s!=='No Strategy Used'):['SOA Levels'];fEmoRating=tr?tr.emotionRating||7:7;fRules=tr?[...(tr.rulesFollowed||[])]:[];document.getElementById('f-notes').value=tr?tr.notes||'':'';const simField=document.getElementById('modal-similar-field');const simBtn=document.getElementById('modal-similar-btn');const simMsg=document.getElementById('modal-similar-msg');if(simMsg)simMsg.textContent='';const simIds=tr?similarTradeIds():[];if(simField){if(tr&&simIds.length){simField.style.display='block';simBtn.textContent=`Apply these tags to ${simIds.length} similar trade${simIds.length!==1?'s':''} on this day`}else simField.style.display='none'}const ssField=document.getElementById('modal-screenshots-field');const ssCont=document.getElementById('modal-screenshots');if(tr&&tr.screenshots&&tr.screenshots.length){ssField.style.display='block';ssCont.innerHTML=tr.screenshots.map(img=>`<img src="${img}" onclick="openScreenshot(this.src)" alt="Trade screenshot">`).join('')}else{ssField.style.display='none';ssCont.innerHTML=''}rSOA();switchModalTab('trade');toggleManualDay();document.getElementById('tradeModal').classList.add('active')}

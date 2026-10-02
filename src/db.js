@@ -341,6 +341,10 @@ const initDB = async () => {
       -- Manual day entries: a day recorded without executions (blown account, missing export)
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS manual_day BOOLEAN DEFAULT FALSE;
       ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_count INTEGER;
+      -- The broker's own account label from the CSV. Without it, the same setup
+      -- taken on two prop accounts is indistinguishable from the same file
+      -- imported twice, and the second account's trades get dropped.
+      ALTER TABLE trades ADD COLUMN IF NOT EXISTS broker_account VARCHAR(80) DEFAULT '';
 
       -- Normalize legacy M/D/YY and MM/DD/YYYY trade dates to ISO (idempotent)
       UPDATE trades SET date = to_char(

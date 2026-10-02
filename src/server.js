@@ -138,7 +138,7 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
       fees: parseFloat(r.fees), grossPnl: parseFloat(r.gross_pnl),
       strategy: r.strategy, emotionRating: r.emotion_rating,
       rulesFollowed: r.rules_followed || [], notes: r.notes,
-      screenshots: r.screenshots || [], importedFrom: r.imported_from, accountId: r.account_id, manualDay: r.manual_day || false, tradeCount: r.trade_count
+      screenshots: r.screenshots || [], importedFrom: r.imported_from, accountId: r.account_id, brokerAccount: r.broker_account || '', manualDay: r.manual_day || false, tradeCount: r.trade_count
     }));
     res.json(trades);
   } catch (err) {
@@ -151,8 +151,8 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
   try {
     const t = req.body;
     await pool.query(
-      `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id, manual_day, trade_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+      `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id, broker_account, manual_day, trade_count)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        ON CONFLICT (id) DO UPDATE SET
          date=EXCLUDED.date, instrument=EXCLUDED.instrument, ticker=EXCLUDED.ticker,
          direction=EXCLUDED.direction, entry_price=EXCLUDED.entry_price, exit_price=EXCLUDED.exit_price,
@@ -160,12 +160,12 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
          fees=EXCLUDED.fees, gross_pnl=EXCLUDED.gross_pnl, strategy=EXCLUDED.strategy,
          emotion_rating=EXCLUDED.emotion_rating, rules_followed=EXCLUDED.rules_followed,
          notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from,
-         account_id=EXCLUDED.account_id, manual_day=EXCLUDED.manual_day, trade_count=EXCLUDED.trade_count`,
+         account_id=EXCLUDED.account_id, broker_account=EXCLUDED.broker_account, manual_day=EXCLUDED.manual_day, trade_count=EXCLUDED.trade_count`,
       [t.id, req.user.id, t.date, t.instrument||'futures', t.ticker, t.direction,
        t.entryPrice||'', t.exitPrice||'', t.quantity||'1', t.stopLoss||'',
        t.pnl||0, t.fees||0, t.grossPnl||t.pnl||0, t.strategy||'No Strategy Used',
        t.emotionRating||7, t.rulesFollowed||[], t.notes||'',
-       t.screenshots||[], t.importedFrom||'', t.accountId||null, !!t.manualDay, t.tradeCount||null]
+       t.screenshots||[], t.importedFrom||'', t.accountId||null, String(t.brokerAccount||'').slice(0,80), !!t.manualDay, t.tradeCount||null]
     );
     res.json({ success: true });
   } catch (err) {
@@ -192,14 +192,14 @@ app.post('/api/trades/bulk', authMiddleware, async (req, res) => {
               notes=EXCLUDED.notes, screenshots=EXCLUDED.screenshots, imported_from=EXCLUDED.imported_from`
           : `ON CONFLICT (id) DO NOTHING`;
         await client.query(
-          `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id, manual_day, trade_count)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+          `INSERT INTO trades (id, user_id, date, instrument, ticker, direction, entry_price, exit_price, quantity, stop_loss, pnl, fees, gross_pnl, strategy, emotion_rating, rules_followed, notes, screenshots, imported_from, account_id, broker_account, manual_day, trade_count)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
            ${conflictClause}`,
           [t.id, req.user.id, t.date, t.instrument||'futures', t.ticker, t.direction,
            t.entryPrice||'', t.exitPrice||'', t.quantity||'1', t.stopLoss||'',
            t.pnl||0, t.fees||0, t.grossPnl||t.pnl||0, t.strategy||'No Strategy Used',
            t.emotionRating||7, t.rulesFollowed||[], t.notes||'',
-           t.screenshots||[], t.importedFrom||'', t.accountId||null, !!t.manualDay, t.tradeCount||null]
+           t.screenshots||[], t.importedFrom||'', t.accountId||null, String(t.brokerAccount||'').slice(0,80), !!t.manualDay, t.tradeCount||null]
         );
       }
       await client.query('COMMIT');
@@ -1707,7 +1707,7 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
     } else {
       const r = await pool.query(
         `INSERT INTO accounts (user_id, name, firm, env, broker_ids, tv_user, tv_pass_enc, phase, profit_target, max_drawdown, min_days, consistency_pct, payout_min, account_size, anchor_balance, anchor_date, dd_type, dd_amount, dd_lock, hwm_override, status, retain_balance)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
         [req.user.id, a.name, a.firm||'', a.env==='live'?'live':'demo', a.brokerIds||'', a.tvUser||'', passEnc,
          a.phase||'eval', a.profitTarget||0, a.maxDrawdown||0, a.minDays||0, a.consistencyPct||0, a.payoutMin||0,
          a.accountSize||0, a.anchorBalance||0, a.anchorDate||'', DD_TYPES.includes(a.ddType)?a.ddType:'static',
