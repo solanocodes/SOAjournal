@@ -1028,7 +1028,7 @@ DATES: all dates are US Eastern trading days. The conversation history can span 
 Style: direct, specific, mentor voice. Short paragraphs. Plain text with **bold** for emphasis. No emoji, no headers. Under 250 words unless performing a requested audit.`;
 
 const COACH_TOOLS = [
-  { name: 'query_trades', description: 'Query the trader\'s real trade history with filters. Returns aggregates and up to 50 matching trades.',
+  { name: 'query_trades', description: 'Query the trader\'s real trade history with filters. Returns aggregates and up to 50 matching trades. Copy trades (one entry mirrored across several prop accounts) are already merged into a single trade with copied_across_accounts and per_account P&L — treat each returned trade as one decision. Notes are returned in full.',
     input_schema: { type: 'object', properties: {
       day_of_week: { type: 'string', description: 'Filter by weekday name, e.g. Friday' },
       date_from: { type: 'string', description: 'YYYY-MM-DD inclusive' },
@@ -1090,12 +1090,72 @@ function aggr(rows) {
     avg_emotion: rows.length ? +(rows.reduce((a,t) => a + (t.emotion||5), 0) / rows.length).toFixed(1) : 0 };
 }
 
-async function coachTool(name, input, userId) {
-  const tr = (await pool.query(
-    'SELECT date, ticker, direction, pnl, strategy, emotion_rating, rules_followed, notes FROM trades WHERE user_id = $1 ORDER BY date ASC', [userId]
+// Copy traders run one decision across several prop accounts, so the same
+// trade lands once per account. Delta has to judge decisions, not fills, or it
+// sees four losses where the trader made one call.
+function tickerRoot(t) {
+  const s = String(t || '').toUpperCase().replace(/\s+/g, '');
+  const m = s.match(/^([A-Z0-9]+?)[FGHJKMNQUVXZ]\d{1,4}$/);
+  return m ? m[1] : s;
+}
+function groupCopyTrades(rows) {
+  const out = [];
+  const open = new Map();
+  for (const r of rows) {
+    const acct = r.acct;
+    const ep = parseFloat(r.entry), xp = parseFloat(r.exit);
+    const key = r.date + '|' + tickerRoot(r.ticker) + '|' + String(r.direction).toLowerCase();
+    let hit = null;
+    if (acct && isFinite(ep) && isFinite(xp)) {
+      const tol = Math.max(Math.abs(ep) * 0.0002, 0.000001);
+      for (const g of open.get(key) || []) {
+        if (g._accts.has(acct)) continue;
+        if (Math.abs(g._ep - ep) <= tol && Math.abs(g._xp - xp) <= tol) { hit = g; break; }
+      }
+    }
+    if (hit) {
+      hit._accts.add(acct);
+      hit.pnl = +(hit.pnl + r.pnl).toFixed(2);
+      hit.copies.push({ account: acct, pnl: r.pnl });
+      if ((r.notes || '').length > (hit.notes || '').length) hit.notes = r.notes;
+      hit.rules_followed = Math.max(hit.rules_followed, r.rules_followed);
+      continue;
+    }
+    const g = { date: r.date, ticker: r.ticker, direction: r.direction, pnl: r.pnl, strategy: r.strategy,
+      emotion: r.emotion, rules_followed: r.rules_followed, notes: r.notes || '',
+      copies: [{ account: acct || '', pnl: r.pnl }], _accts: new Set(acct ? [acct] : []), _ep: ep, _xp: xp };
+    out.push(g);
+    if (!open.has(key)) open.set(key, []);
+    open.get(key).push(g);
+  }
+  return out;
+}
+function decisionView(g, noteCap) {
+  const o = { date: g.date, ticker: g.ticker, direction: g.direction, pnl: g.pnl, strategy: g.strategy,
+    emotion: g.emotion, rules_followed: g.rules_followed,
+    notes: g.notes.length > noteCap ? g.notes.slice(0, noteCap) + '…' : g.notes };
+  if (g.copies.length > 1) {
+    o.copied_across_accounts = g.copies.length;
+    o.per_account = g.copies.map(c => ({ account: c.account, pnl: c.pnl }));
+  }
+  return o;
+}
+async function loadCoachTrades(userId) {
+  const rows = (await pool.query(
+    `SELECT date, ticker, direction, pnl, strategy, emotion_rating, rules_followed, notes, entry_price, exit_price,
+            COALESCE(NULLIF(broker_account, ''), account_id::text, '') AS acct
+       FROM trades WHERE user_id = $1 ORDER BY date ASC, created_at ASC, id ASC`, [userId]
   )).rows.map(r => ({ date: normDateStr(r.date), ticker: r.ticker, direction: r.direction,
     pnl: parseFloat(r.pnl), strategy: r.strategy, emotion: r.emotion_rating,
-    rules_followed: (r.rules_followed||[]).length, notes: (r.notes||'').slice(0,80) }));
+    rules_followed: (r.rules_followed||[]).length, notes: r.notes || '',
+    entry: r.entry_price, exit: r.exit_price, acct: r.acct || '' }));
+  const sorted = rows.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return { fills: rows.length, decisions: groupCopyTrades(sorted) };
+}
+
+async function coachTool(name, input, userId) {
+  const loaded = await loadCoachTrades(userId);
+  const tr = loaded.decisions;
 
   if (name === 'query_trades') {
     let rows = tr;
@@ -1111,7 +1171,14 @@ async function coachTool(name, input, userId) {
     if (input.result === 'win') rows = rows.filter(t => t.pnl > 0);
     if (input.result === 'loss') rows = rows.filter(t => t.pnl < 0);
     const lim = Math.min(input.limit || 20, 50);
-    return { ...aggr(rows), trades: rows.slice(-lim) };
+    const picked = rows.slice(-lim);
+    const fills = rows.reduce((a, g) => a + g.copies.length, 0);
+    const base = { ...aggr(rows), note: 'Each trade below is ONE decision. count and win_rate are per decision. A trade with copied_across_accounts was copy-traded: the same entry placed on several prop accounts at once, so it is one decision, one result, and counts once against any trades-per-day or losses-per-day rule. pnl is the combined P&L across the copies.',
+      account_fills: fills };
+    let cap = 2000, out;
+    do { out = { ...base, trades: picked.map(g => decisionView(g, cap)) }; cap = Math.floor(cap / 2); }
+    while (JSON.stringify(out).length > 38000 && cap >= 100);
+    return out;
   }
   if (name === 'get_risk_plan') {
     const r = (await pool.query('SELECT * FROM risk_plans WHERE user_id = $1', [userId])).rows[0];
@@ -1246,15 +1313,12 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
       'SELECT role, content, created_at FROM coach_messages WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [req.user.id]
     )).rows.reverse();
 
-    const stats = (await pool.query(
-      `SELECT COUNT(*)::int AS n, COALESCE(SUM(pnl),0) AS pnl,
-        COUNT(*) FILTER (WHERE pnl > 0)::int AS wins,
-        COUNT(*) FILTER (WHERE strategy IS NULL OR strategy = 'No Strategy Used')::int AS untagged
-       FROM trades WHERE user_id = $1`, [req.user.id]
-    )).rows[0];
-
-    let dyn = `Trader snapshot: ${stats.n} trades, net P&L $${parseFloat(stats.pnl).toFixed(2)}, ` +
-      `${stats.n ? (stats.wins / stats.n * 100).toFixed(1) : 0}% win rate, ${stats.untagged} untagged trades. Today: ${etTodayStr()} (${etParts().weekday}, US Eastern trading day).\n`;
+    const snap = await loadCoachTrades(req.user.id);
+    const sd = snap.decisions, sWins = sd.filter(t => t.pnl > 0).length;
+    const copied = sd.filter(t => t.copies.length > 1).length;
+    let dyn = `Trader snapshot: ${sd.length} trades (decisions), net P&L $${sd.reduce((a, t) => a + t.pnl, 0).toFixed(2)}, ` +
+      `${sd.length ? (sWins / sd.length * 100).toFixed(1) : 0}% win rate, ${sd.filter(isUntagged).length} untagged trades. Today: ${etTodayStr()} (${etParts().weekday}, US Eastern trading day).\n`;
+    if (copied) dyn += `This trader COPY TRADES: ${copied} of those decisions were placed on several prop accounts at once (${snap.fills} account fills in total). query_trades already merges the copies into one trade — never count copies as separate trades, losses or rule breaks.\n`;
     dyn += memRows.length
       ? 'Your memory of this trader:\n' + memRows.map(m => `- [${m.kind}] ${m.content} (${String(m.created_at).slice(0,10)})`).join('\n')
       : 'Your memory of this trader is EMPTY — run the intake interview.';
@@ -1339,7 +1403,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
         let out;
         try { out = await coachTool(tu.name, tu.input || {}, req.user.id); }
         catch (e) { console.error('Coach tool error:', tu.name, e.message); out = { error: 'tool failed: ' + e.message }; }
-        results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 12000) });
+        results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 40000) });
       }
       messages.push({ role: 'user', content: results });
     }
