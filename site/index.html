@@ -1251,77 +1251,11 @@ function getRT(){const u=getUserRT();return{...DEFAULT_RT_FEES,...u}}
 let RT_FEES={...DEFAULT_RT_FEES};
 function refreshFees(){RT_FEES={...DEFAULT_RT_FEES,...getUserRT()}}
 
-// ═══ DISCORD WEBHOOKS ═══
-const DISCORD_WEBHOOKS=['https://discord.com/api/webhooks/1486817423146619080/OfibCXR9lHlJgmKeZ57E7awC1vSzsjdAdLO_ngXNh3HiA9GVVIs3pnnIFTU3pm9-k084','https://discord.com/api/webhooks/1488331466445160572/pDBn-ljENFTB3z66sxmRXBVRUzrF0KGzprXpuJtZB2_44LKIaBzQOwIOO6St1s_D5eT5'];
-
-
-function shareToDiscord(type,data){
-  const btn=event?.target?.closest('.btn-export');
-  if(btn){btn.innerHTML='<span class="btn-export-icon">⏳</span> Sharing...';}
-  
-  let embed;
-  if(type==='daily'){
-    const color=data.pnl>=0?3066993:15158332;
-    const pnlStr=data.pnl>=0?'+'+f$(data.pnl):f$(data.pnl);
-    embed={
-      title:curUser.toUpperCase()+' — '+data.date,
-      description:(data.pnl>=0?'🟢':'🔴')+' **'+pnlStr+'** today',
-      color:color,
-      fields:[
-        {name:'Net P&L',value:'**'+pnlStr+'**',inline:true},
-        {name:'Win Rate',value:'**'+data.wr+'%**',inline:true},
-        {name:'Trades',value:'**'+data.trades+'**',inline:true},
-        {name:'Wins / Losses',value:'**'+data.wins+' / '+data.losses+'**',inline:true},
-        {name:'Avg Emotion',value:'**'+data.emotion+'/10**',inline:true},
-        {name:'Streak',value:'**'+getStreakData().current+'d 🔥**',inline:true}
-      ],
-      footer:{text:curUser+' · SOA Trading Journal'},
-      timestamp:new Date().toISOString()
-    };
-  }else if(type==='weekly'){
-    const color=data.pnl>=0?3066993:15158332;
-    const pnlStr=data.pnl>=0?'+'+f$(data.pnl):f$(data.pnl);
-    embed={
-      title:curUser.toUpperCase()+' — Weekly Report',
-      description:(data.pnl>=0?'🟢':'🔴')+' **'+pnlStr+'** this week · '+data.week,
-      color:color,
-      fields:[
-        {name:'Net P&L',value:'**'+pnlStr+'**',inline:true},
-        {name:'Win Rate',value:'**'+data.wr+'%**',inline:true},
-        {name:'Trades',value:'**'+data.trades+'**',inline:true},
-        {name:'Avg Emotion',value:'**'+data.emotion+'/10**',inline:true},
-        {name:'Rules',value:'**'+data.rules+'**',inline:true},
-        {name:'Streak',value:'**'+data.streak+'d 🔥**',inline:true}
-      ],
-      footer:{text:curUser+' · SOA Trading Journal'},
-      timestamp:new Date().toISOString()
-    };
-  }
-  
-  Promise.all(DISCORD_WEBHOOKS.map(url=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({embeds:[embed]})}))).then(()=>{
-    if(btn){btn.innerHTML='<span class="btn-export-icon">✅</span> Shared!';setTimeout(()=>{btn.innerHTML='<span class="btn-export-icon">🚀</span> Share to Discord'},2000)}
-  }).catch(err=>{
-    console.error('Discord share error:',err);
-    if(btn){btn.innerHTML='<span class="btn-export-icon">❌</span> Failed';setTimeout(()=>{btn.innerHTML='<span class="btn-export-icon">🚀</span> Share to Discord'},2000)}
-  });
-}
-
-function sendDiscord(payload){
-  DISCORD_WEBHOOKS.forEach(url=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(err=>console.log('Discord webhook error:',err)));
-}
-
-function sendMilestoneToDiscord(milestone){
-  sendDiscord({
-    embeds:[{
-      title:curUser.toUpperCase()+' just hit a milestone!',
-      description:milestone.icon+' **'+milestone.title+'**\n'+milestone.desc,
-      color:3066993,
-      footer:{text:curUser+' · SOA Trading Journal'},
-      timestamp:new Date().toISOString()
-    }]
-  });
-}
-
+// Journal posts to Discord are turned off: the share buttons and milestone
+// auto-posts were flooding the share-your-wins channel. The mentor roll call
+// still posts from the server.
+function shareToDiscord(){}
+function sendMilestoneToDiscord(){}
 
 
 
@@ -1753,7 +1687,7 @@ function rBadges(el){chkBdg();const e=gBdg();el.innerHTML=`<h3 style="font-size:
 function chkBdg(){const e=gBdg();let ch=false;BD.forEach(b=>{if(!e[b.id]&&b.ck(trades)){e[b.id]=new Date().toISOString();ch=true}});if(ch)sBdg(e)}
 
 // ─── REPORT ───
-function rReport(el){const{s:st,e:en}=wRange(repOff);const wt=trades.filter(t=>{const d=new Date(t.date);return d>=st&&d<=en});const wl=`${fD(st)} — ${fD(en)}`;let h=`<div class="report-nav fade-up"><button class="cal-nav-btn" onclick="repOff++;ren()">◀</button><span style="font-weight:700;min-width:260px;text-align:center">${wl}</span><button class="cal-nav-btn" onclick="if(repOff>0){repOff--;ren()}" ${repOff===0?'disabled style="opacity:.3"':''}>▶</button></div>`;if(!wt.length){h+=`<div class="empty-state fade-up"><div class="empty-icon">📄</div><h3 class="empty-title">No trades this week</h3></div>`;el.innerHTML=h;return}const s=cStats(wt);let ins='';if(s.wr>=60)ins='Excellent week.';else if(s.wr>=50)ins='Solid week — tighten rule compliance.';else ins='Tough week. Review each loss.';h+=`<div class="report-card fade-up" id="weeklyReportCard"><div class="report-header"><h2>📄 Weekly Report Card</h2><p>${wl}</p></div><div class="report-section"><h3>💰 Performance</h3><div class="report-grid"><div class="report-metric"><div class="report-metric-label">Net P&L</div><div class="report-metric-value" style="color:${s.np>=0?'var(--green)':'var(--red)'}">${f$(s.np)}</div></div><div class="report-metric"><div class="report-metric-label">Win Rate</div><div class="report-metric-value">${s.wr.toFixed(1)}%</div></div><div class="report-metric"><div class="report-metric-label">Total Trades</div><div class="report-metric-value">${s.tot}</div></div><div class="report-metric"><div class="report-metric-label">Avg Emotion</div><div class="report-metric-value" style="color:${emoColor(Math.round(s.avgEmo))}">${s.avgEmo.toFixed(1)}/10</div></div></div></div><div class="report-section"><h3>🧠 Discipline</h3><div class="report-grid"><div class="report-metric"><div class="report-metric-label">Avg Rules</div><div class="report-metric-value">${(wt.reduce((a,t)=>a+(t.rulesFollowed||[]).length,0)/wt.length).toFixed(1)}/${RL.length}</div></div><div class="report-metric"><div class="report-metric-label">Streak</div><div class="report-metric-value">${s.sk}d</div></div></div><div class="report-insight">${ins}</div></div></div><div class="export-bar"><button class="btn-export" onclick="exportAsImage('weeklyReportCard','SOA-Weekly-Report')"><span class="btn-export-icon">📥</span> Download Image</button><button class="btn-export" onclick="copyAsImage('weeklyReportCard')"><span class="btn-export-icon">📋</span> Copy to Clipboard</button><button class="btn-export" onclick="shareToDiscord('weekly',{pnl:${s.np},wr:'${s.wr.toFixed(1)}',trades:${s.tot},emotion:'${s.avgEmo.toFixed(1)}',rules:'${(wt.reduce((a,t)=>a+(t.rulesFollowed||[]).length,0)/wt.length).toFixed(1)}/${RL.length}',streak:${s.sk},week:'${wl}'})"><span class="btn-export-icon">🚀</span> Share to Discord</button></div>`;el.innerHTML=h}
+function rReport(el){const{s:st,e:en}=wRange(repOff);const wt=trades.filter(t=>{const d=new Date(t.date);return d>=st&&d<=en});const wl=`${fD(st)} — ${fD(en)}`;let h=`<div class="report-nav fade-up"><button class="cal-nav-btn" onclick="repOff++;ren()">◀</button><span style="font-weight:700;min-width:260px;text-align:center">${wl}</span><button class="cal-nav-btn" onclick="if(repOff>0){repOff--;ren()}" ${repOff===0?'disabled style="opacity:.3"':''}>▶</button></div>`;if(!wt.length){h+=`<div class="empty-state fade-up"><div class="empty-icon">📄</div><h3 class="empty-title">No trades this week</h3></div>`;el.innerHTML=h;return}const s=cStats(wt);let ins='';if(s.wr>=60)ins='Excellent week.';else if(s.wr>=50)ins='Solid week — tighten rule compliance.';else ins='Tough week. Review each loss.';h+=`<div class="report-card fade-up" id="weeklyReportCard"><div class="report-header"><h2>📄 Weekly Report Card</h2><p>${wl}</p></div><div class="report-section"><h3>💰 Performance</h3><div class="report-grid"><div class="report-metric"><div class="report-metric-label">Net P&L</div><div class="report-metric-value" style="color:${s.np>=0?'var(--green)':'var(--red)'}">${f$(s.np)}</div></div><div class="report-metric"><div class="report-metric-label">Win Rate</div><div class="report-metric-value">${s.wr.toFixed(1)}%</div></div><div class="report-metric"><div class="report-metric-label">Total Trades</div><div class="report-metric-value">${s.tot}</div></div><div class="report-metric"><div class="report-metric-label">Avg Emotion</div><div class="report-metric-value" style="color:${emoColor(Math.round(s.avgEmo))}">${s.avgEmo.toFixed(1)}/10</div></div></div></div><div class="report-section"><h3>🧠 Discipline</h3><div class="report-grid"><div class="report-metric"><div class="report-metric-label">Avg Rules</div><div class="report-metric-value">${(wt.reduce((a,t)=>a+(t.rulesFollowed||[]).length,0)/wt.length).toFixed(1)}/${RL.length}</div></div><div class="report-metric"><div class="report-metric-label">Streak</div><div class="report-metric-value">${s.sk}d</div></div></div><div class="report-insight">${ins}</div></div></div><div class="export-bar"><button class="btn-export" onclick="exportAsImage('weeklyReportCard','SOA-Weekly-Report')"><span class="btn-export-icon">📥</span> Download Image</button><button class="btn-export" onclick="copyAsImage('weeklyReportCard')"><span class="btn-export-icon">📋</span> Copy to Clipboard</button></div>`;el.innerHTML=h}
 
 // ─── MENTOR ───
 function rMentor(el){if(!isMentor){el.innerHTML='<div class="empty-state"><div class="empty-icon">🔒</div><h3 class="empty-title">Mentor access only</h3></div>';return}
@@ -4218,7 +4152,7 @@ function rRecap(el){
   <div class="export-bar">
     <button class="btn-export" onclick="exportAsImage('recapCard','SOA-Recap-${recapDate}')"><span class="btn-export-icon">📥</span> Download Image</button>
     <button class="btn-export" onclick="copyAsImage('recapCard')"><span class="btn-export-icon">📋</span> Copy to Clipboard</button>
-    <button class="btn-export" onclick="shareToDiscord('daily',{pnl:${tp},wr:'${wr.toFixed(1)}',trades:${dayTrades.length},wins:${wins},losses:${losses},emotion:'${avgEmo.toFixed(1)}',date:'${fD(recapDate)}'})"><span class="btn-export-icon">🚀</span> Share to Discord</button>
+    
   </div>`;
   el.innerHTML=h;
 }
